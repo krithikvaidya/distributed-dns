@@ -8,7 +8,7 @@ package grpc_chat;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package="github.com/IEEE-NITK/distributed-dns/gRPC_Chat/protos";
+option go_package="github.com/krithikvaidya/distributed-dns/gRPC_Chat/protos";
 
 service Chat {
 
