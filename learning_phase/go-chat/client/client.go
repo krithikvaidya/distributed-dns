@@ -1,3 +1,20 @@
+/**
+This file contains the definition for the client struct and functions implemented
+by the client struct.
+
+Other related functions are also contained in this file
+
+There are two main phases that a client process goes through:
+- The first phase is an initialization procedure where the client object is created and
+the connection with the target server is established.
+- The second phase begins after the connection with the server is established. This phase
+is where the main messaging loop is maintained.
+
+Functionally, this messaing loop of the client process is comprised of two goroutines,
+one listening for and receiving messages from the server it is connected to and the other,
+that takes the message from the user and sends it to the server it is connected to.
+*/
+
 package client
 
 import (
@@ -5,26 +22,33 @@ import (
 
 )
 
+/*
+This is the struct that characterizes each client process
+*/
 type client struct {
 
-	Username       string
-	ServerPassword string
-	ServerHost     string  // ip:port or :port
+	Username       string  // If not specified, a random string is chosen using RandSeq() in shared.go
+	ServerPassword string  // The server password specified by the user
+	ServerHost     string  // ip:port or :port, by default, it is "0.0.0.0:4545"
 
 }
+
 
 type message_struct struct {
 
 	Type    int  // can define 0 = unicast, 1 = broadcast
-	Message string
-	Sender  string
+	Message string  // The string containing the message
+	Sender  string  // The username of the sender
 
 }
 
 
 func Client(password string, host string, username string) *client {
 
-	// Initialize and return client
+	/*
+	An instance of the 'client' struct is created, initialized with given
+	or the default data(if the user hasn't specified the data).
+	*/
 
 }
 
