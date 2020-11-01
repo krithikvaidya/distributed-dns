@@ -30,6 +30,13 @@ import (
 
 var (
 	// Define variables for command line parameters here if using init() function
+	/**
+	Ideally, we would have command line parameters for the following purposes:
+	- For starting the server process
+	- For setting the server properties like IP address, port number and password
+	- For setting the parameters with which the client connects to the server like the
+	  username, target server IP address, port number and the password.
+	*/
 )
 
 
