@@ -13,6 +13,15 @@ Protocol for sending/receiving messages:
 5. message~<username>~<type>~<message>~\n  --> from server to client(s). Type indicates unicast/broadcast.
 6. terminate~<reason>~\n  --> from server to client, for graceful shutdown
 
+Possible extensions:
+dockerize the application
+use gorilla websockets instead of raw sockets, get a web-based frontend
+use RPCs for communication instead of raw sockets
+persist messages
+write tests
+add security
+deploy to heroku
+
 */
 
 import (
@@ -31,10 +40,11 @@ func main() {
 	- Create a cancellable context to be passed to client/server functions
 	- Listen for appropriate termination signals (refer to https://gobyexample.com/signals) in a separate goroutine
 	- The above goroutine should call the context's cancel function on receiving a termination signal,
-	  and wait for the client/server function called below to complete its execution (hint: using channels)
-	- The main function should then decide whether the execution will be in client mode or in server mode.
-	  On deciding, it should create & initialize a new struct of client/server type (which will be defined 
-	  in client.go and server.go), and call the respective Run() function  
+	  and wait for the client/server function called below to complete its execution (how will this goroutine know
+	  when the client/server function called has completed execution?). Then it can finally terminate the program.
+	- The main function should then decide whether the execution will be in client mode or in server mode
+	  (by reading the command line parameters). On deciding, it should create & initialize a new struct of
+	  client/server type (which will be defined in client.go and server.go), and call the respective Run() function  
 	*/
 
 }
