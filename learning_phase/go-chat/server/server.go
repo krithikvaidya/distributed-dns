@@ -15,20 +15,19 @@ There are two main classes of goroutines that exist in the server process:
 package server
 
 import (
-
+	"context"
+	"net"
 )
 
 // This struct characterizes the server process
 type server struct {
-
 }
-
 
 func Server(pass string, address string) *server {
 
 	/*
-	An instance of the 'server' struct is created, initialized with given
-	or the default data(if the user hasn't specified the data).
+		An instance of the 'server' struct is created, initialized with given
+		or the default data(if the user hasn't specified the data).
 	*/
 
 }
@@ -45,7 +44,7 @@ func (ser *server) listenForMessages(ctx context.Context, conn net.Conn, usernam
 
 	/**
 	Spawned by handleClient(). Listens for messages sent by the given client, and appropriately unicasts/broadcast/
-	prints error message, etc. 
+	prints error message, etc.
 	*/
 
 }
@@ -58,8 +57,6 @@ func (ser *server) handleClient(ctx context.Context, conn net.Conn) {
 	and messages written to the term channel in the above function
 	*/
 
-
-
 }
 
 func (ser *server) listenForConnections(ctx context.Context, newConn chan net.Conn, listener *net.TCPListener) {
@@ -68,7 +65,6 @@ func (ser *server) listenForConnections(ctx context.Context, newConn chan net.Co
 	// Accept incoming connections from clients and write it to the newConn channel
 
 }
-
 
 func (ser *server) Run(ctx context.Context) {
 
