@@ -21,6 +21,7 @@ const (
 )
 
 type RaftNode struct {
+	protos.UnimplementedConsensusServiceServer
 	n_replicas             int
 	replica_id             int
 	peer_replica_addresses []net.Conn
@@ -98,14 +99,14 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
-	log.Printf("\nReceived ReplicaReady\n")
+	// ...
 	return &protos.RequestVoteResponse{}, nil
 
 }
 
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
-	log.Printf("\nReceived ReplicaReady\n")
+	// ...
 	return &protos.AppendEntriesResponse{}, nil
 
 }

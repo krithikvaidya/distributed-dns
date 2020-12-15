@@ -59,16 +59,34 @@ func main() {
 
 	}
 
+	fmt.Printf("\nok\n")
+
 	grpcServer := grpc.NewServer()
 
 	node := InitializeNode(n_replica, rid)
 
 	protos.RegisterConsensusServiceServer(grpcServer, node)
+	serveSuccess := make(chan bool)
 
-	err = grpcServer.Serve(listener)
-	CheckError(err)
+	go func(serveSuccess chan bool) {
 
-	fmt.Printf("\ngRPC server listening...\n")
+		err := grpcServer.Serve(listener)
+
+		if err != nil {
+			serveSuccess <- false
+			return
+		}
+
+		serveSuccess <- true
+
+	}(serveSuccess)
+
+	if status := <-serveSuccess; status {
+		fmt.Printf("\ngRPC server listening...\n")
+	} else {
+		fmt.Printf("\nFailure in initializing gRPC server, exiting...\n")
+		return
+	}
 
 	fmt.Printf("\nPress enter when all other nodes are online.\n")
 	var input rune
