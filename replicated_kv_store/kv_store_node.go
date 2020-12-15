@@ -1,51 +1,40 @@
 package main
 
 import (
-	"sync"
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
-const (
-	Follower int = iota
-	Candidate
-	Leader
-	Down
-)
+func main() {
 
-type RaftNode struct {
-	replica_id       int
-	peer_replica_ids []int
-	raft_node_mutex  sync.Mutex
+	log.SetFlags(0) // Turn off timestamps in log output.
+	rand.Seed(time.Now().UnixNano())
 
-	// States mentioned in figure 2 of the paper:
+	fmt.Println("\nRaft-based Replicated Key Value Store\n")
 
-	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int
-	votedFor    int
-	log         []LogEntry
+	fmt.Printf("Enter the replica's id: ")
+	var rid int
+	fmt.Scanf("%d", &rid)
 
-	// State to be maintained on all replicas
-	commitIndex        int
-	lastApplied        int
-	state              CMState
-	electionResetEvent time.Time
+	fmt.Printf("\nEnter the TCP network address that the replica should bind to (eg - :7890): ")
+	var address string
+	fmt.Scanf("%s", &address)
 
-	// State to be maintained on the leader
-	nextIndex  map[int]int
-	matchIndex map[int]int
-}
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", address)
+	CheckError(err)
 
-func GetState(state int) string {
+	// Start listening for TCP connections
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	CheckError(err)
 
-	switch state {
-	case Follower:
-		return "Follower"
-	case Candidate:
-		return "Candidate"
-	case Leader:
-		return "Leader"
-	case Down:
-		return "Down"
-	}
+	grpcServer := grpc.NewServer()
+
+	err = grpcServer.Serve(listener)
+	checkError(err)
 
 }
