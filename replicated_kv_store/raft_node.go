@@ -24,6 +24,7 @@ const (
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 	n_replicas             int
+	replicas_ready         int
 	replica_id             int
 	peer_replica_addresses []net.Conn
 	raft_node_mutex        sync.Mutex
@@ -47,34 +48,12 @@ type RaftNode struct {
 	matchIndex []int
 }
 
-func GetState(state RaftNodeState) string {
-
-	switch state {
-
-	case Follower:
-		return "Follower"
-	case Candidate:
-		return "Candidate"
-	case Leader:
-		return "Leader"
-	case Down:
-		return "Down"
-
-	}
-
-	return "Invalid"
-
-}
-
-var replicas_ready int
-
 func InitializeNode(n_replica int, rid int) *RaftNode {
-
-	replicas_ready = 0
 
 	rn := &RaftNode{
 
 		n_replicas:             n_replica,
+		replicas_ready:         0,
 		replica_id:             rid,
 		peer_replica_addresses: make([]net.Conn, n_replica),
 		node_state:             Follower,
@@ -119,7 +98,17 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
 
-	log.Printf("\nReceived ReplicaReady\n")
+	node.raft_node_mutex.Lock() // Multiple instances of ReplicaReady method may run parallely
+
+	log.Printf("\nReceived ReplicaReady Notification\n")
+	node.replicas_ready += 1
+
+	if node.replicas_ready == node.n_replicas-1 {
+		log.Printf("\nAll replicas connected.\n")
+	}
+
+	node.raft_node_mutex.Unlock() // Multiple instances of ReplicaReady method may run parallely
+
 	return &empty.Empty{}, nil
 
 }
