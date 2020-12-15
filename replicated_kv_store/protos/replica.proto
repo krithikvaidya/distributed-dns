@@ -1,6 +1,10 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package protos;
+
+option go_package = "github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos";
 
 message RequestVoteMessage {
 
@@ -39,6 +43,7 @@ message AppendEntriesResponse {
 
 service ConsensusService {
 
+  rpc ReplicaReady(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc RequestVote(RequestVoteMessage) returns (RequestVoteResponse) {}
   rpc AppendEntries(AppendEntriesMessage) returns (AppendEntriesResponse) {}
 
