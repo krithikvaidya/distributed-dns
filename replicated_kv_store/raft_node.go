@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"net"
 	"sync"
 	"time"
 
@@ -23,12 +22,12 @@ const (
 
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	n_replicas             int
-	replicas_ready         int
-	replica_id             int
-	peer_replica_addresses []net.Conn
-	raft_node_mutex        sync.Mutex
-	node_state             RaftNodeState
+	n_replicas           int
+	replicas_ready       int
+	replica_id           int
+	peer_replica_clients []protos.ConsensusServiceClient
+	raft_node_mutex      sync.Mutex
+	node_state           RaftNodeState
 
 	// States mentioned in figure 2 of the paper:
 
@@ -52,11 +51,11 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 
 	rn := &RaftNode{
 
-		n_replicas:             n_replica,
-		replicas_ready:         0,
-		replica_id:             rid,
-		peer_replica_addresses: make([]net.Conn, n_replica),
-		node_state:             Follower,
+		n_replicas:           n_replica,
+		replicas_ready:       0,
+		replica_id:           rid,
+		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
+		node_state:           Follower,
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -94,20 +93,22 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	}
 
+	node.peer_replica_clients = client_objs
+
 }
 
 func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
 
 	node.raft_node_mutex.Lock() // Multiple instances of ReplicaReady method may run parallely
+	defer node.raft_node_mutex.Unlock()
 
 	log.Printf("\nReceived ReplicaReady Notification\n")
 	node.replicas_ready += 1
 
 	if node.replicas_ready == node.n_replicas-1 {
-		log.Printf("\nAll replicas connected.\n")
+		log.Printf("\nAll replicas have connected.\n")
+		Ready <- true
 	}
-
-	node.raft_node_mutex.Unlock() // Multiple instances of ReplicaReady method may run parallely
 
 	return &empty.Empty{}, nil
 

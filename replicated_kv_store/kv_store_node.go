@@ -14,6 +14,7 @@ import (
 )
 
 var n_replica int
+var Ready chan bool // also accessed in raft_node.go
 
 func init() {
 
@@ -82,8 +83,10 @@ func main() {
 	var input rune
 	fmt.Scanf("%c", &input)
 
+	Ready = make(chan bool)
+
 	node.ConnectToPeerReplicas(rep_addrs)
-	c := make(chan bool)
-	<-c
+
+	<-Ready // wait until all connections have been established.
 
 }
