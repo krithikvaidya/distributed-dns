@@ -9,6 +9,7 @@ import (
 
 	empty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"google.golang.org/grpc"
 )
 
 type RaftNodeState int
@@ -87,6 +88,32 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 	}
 
 	return rn
+
+}
+
+func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
+
+	client_objs := make([]protos.ConsensusServiceClient, node.n_replicas)
+
+	for i := 0; i < node.n_replicas; i++ {
+
+		if i == node.replica_id {
+			continue
+		}
+
+		connxn, err := grpc.Dial(rep_addrs[i], grpc.WithInsecure())
+		CheckError(err)
+
+		defer connxn.Close()
+
+		cli := protos.NewConsensusServiceClient(connxn)
+
+		client_objs[i] = cli
+
+		// Notify replica of connection
+		_, err = client_objs[i].ReplicaReady(context.Background(), &empty.Empty{})
+
+	}
 
 }
 

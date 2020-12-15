@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
@@ -45,7 +46,7 @@ func main() {
 
 	fmt.Printf("\nSuccessfully bound to address %v\n", address)
 
-	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica)
+	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
 
 	rep_addrs := make([]string, n_replica)
 
@@ -59,39 +60,30 @@ func main() {
 
 	}
 
-	fmt.Printf("\nok\n")
-
 	grpcServer := grpc.NewServer()
 
 	node := InitializeNode(n_replica, rid)
 
 	protos.RegisterConsensusServiceServer(grpcServer, node)
-	serveSuccess := make(chan bool)
 
-	go func(serveSuccess chan bool) {
+	go func() {
 
 		err := grpcServer.Serve(listener)
 
 		if err != nil {
-			serveSuccess <- false
-			return
+			os.Exit(1)
 		}
 
-		serveSuccess <- true
+	}()
 
-	}(serveSuccess)
-
-	if status := <-serveSuccess; status {
-		fmt.Printf("\ngRPC server listening...\n")
-	} else {
-		fmt.Printf("\nFailure in initializing gRPC server, exiting...\n")
-		return
-	}
+	fmt.Printf("\ngRPC server listening...\n")
 
 	fmt.Printf("\nPress enter when all other nodes are online.\n")
 	var input rune
 	fmt.Scanf("%c", &input)
 
-	// node.ConnectToPeerReplicas(rep_addrs, rid)
+	node.ConnectToPeerReplicas(rep_addrs)
+	c := make(chan bool)
+	<-c
 
 }
