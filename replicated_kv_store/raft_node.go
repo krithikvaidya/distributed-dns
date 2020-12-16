@@ -89,7 +89,8 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		client_objs[i] = cli
 
 		// Notify replica of connection
-		_, err = client_objs[i].ReplicaReady(context.Background(), &empty.Empty{})
+		_, err = cli.ReplicaReady(context.Background(), &empty.Empty{})
+		CheckError(err)
 
 	}
 
@@ -100,30 +101,18 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
 
 	node.raft_node_mutex.Lock() // Multiple instances of ReplicaReady method may run parallely
-	defer node.raft_node_mutex.Unlock()
 
 	log.Printf("\nReceived ReplicaReady Notification\n")
 	node.replicas_ready += 1
 
 	if node.replicas_ready == node.n_replicas-1 {
 		log.Printf("\nAll replicas have connected.\n")
+		node.raft_node_mutex.Unlock()
 		Ready <- true
+	} else {
+		node.raft_node_mutex.Unlock()
 	}
 
 	return &empty.Empty{}, nil
-
-}
-
-func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
-
-	// ...
-	return &protos.RequestVoteResponse{}, nil
-
-}
-
-func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
-
-	// ...
-	return &protos.AppendEntriesResponse{}, nil
 
 }
