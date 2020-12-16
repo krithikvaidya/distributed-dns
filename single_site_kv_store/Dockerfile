@@ -13,4 +13,4 @@ RUN go build .
 
 EXPOSE 8080
 
-CMD ["./distributed-dns"]
+CMD ["./single_site_kv_store"]

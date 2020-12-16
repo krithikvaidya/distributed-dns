@@ -1,4 +1,4 @@
-module github.com/DeltaCube23/distributed-dns
+module github.com/krithikvaidya/distributed-dns/single_site_kv_store
 
 go 1.15
 
