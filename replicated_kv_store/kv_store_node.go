@@ -17,6 +17,7 @@ var n_replica int
 
 func init() {
 
+	// Command line parameters
 	flag.IntVar(&n_replica, "n", 5, "total number of replicas (default=5)")
 	flag.Parse()
 
@@ -40,7 +41,6 @@ func main() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", address)
 	CheckError(err)
 
-	// Start listening for TCP connections
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	CheckError(err)
 
@@ -62,15 +62,20 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
+	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(n_replica, rid)
 
+	// ConsensusService is defined in protos/replica.proto./
+	// RegisterConsensusServiceServer is present in the generated .pb.go file
 	protos.RegisterConsensusServiceServer(grpcServer, node)
 
+	// gRPC Serve is blocking, so we do it on a separate goroutine
 	go func() {
 
 		err := grpcServer.Serve(listener)
 
 		if err != nil {
+			log.Printf("\nError in gRPC Serve: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -82,11 +87,12 @@ func main() {
 	var input rune
 	fmt.Scanf("%c", &input)
 
+	// Attempt to gRPC dial to other replicas. ConnectToPeerReplicas is defined in raft_node.go
 	node.ConnectToPeerReplicas(rep_addrs)
 
 	<-node.ready_chan // wait until all connections have been established.
 
-	// dummy channel to stall program before exit. Remove it later
+	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)
 	<-all_connected
 
