@@ -85,11 +85,8 @@ func main() {
 
 	Ready = make(chan bool)
 
-	fmt.Printf("hmm")
 	node.ConnectToPeerReplicas(rep_addrs)
-	fmt.Printf("hmm")
 
 	<-Ready // wait until all connections have been established.
 
-	fmt.Printf("hmm")
 }
