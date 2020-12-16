@@ -88,7 +88,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 		client_objs[i] = cli
 
-		response, err := cli.ReplicaReady(context.Background(), &empty.Empty{})
+		_, err = cli.ReplicaReady(context.Background(), &empty.Empty{})
 		CheckError(err)
 
 	}
@@ -101,7 +101,7 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 
 	node.raft_node_mutex.Lock() // Multiple instances of ReplicaReady method may run parallely
 
-	log.Printf("\nReceived ReplicaReady Notification from %v\n", in.Id)
+	log.Printf("\nReceived ReplicaReady Notification\n")
 	node.replicas_ready += 1
 
 	if node.replicas_ready == node.n_replicas-1 {
