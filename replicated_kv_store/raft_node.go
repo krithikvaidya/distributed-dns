@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	empty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -22,6 +22,7 @@ const (
 
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
+	ready_chan           chan bool
 	n_replicas           int
 	replicas_ready       int
 	replica_id           int
@@ -52,6 +53,7 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 	rn := &RaftNode{
 
 		n_replicas:           n_replica,
+		ready_chan:           make(chan bool),
 		replicas_ready:       0,
 		replica_id:           rid,
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
@@ -82,14 +84,11 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		connxn, err := grpc.Dial(rep_addrs[i], grpc.WithInsecure())
 		CheckError(err)
 
-		defer connxn.Close()
-
 		cli := protos.NewConsensusServiceClient(connxn)
 
 		client_objs[i] = cli
 
-		// Notify replica of connection
-		_, err = cli.ReplicaReady(context.Background(), &empty.Empty{})
+		response, err := cli.ReplicaReady(context.Background(), &empty.Empty{})
 		CheckError(err)
 
 	}
@@ -102,17 +101,21 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 
 	node.raft_node_mutex.Lock() // Multiple instances of ReplicaReady method may run parallely
 
-	log.Printf("\nReceived ReplicaReady Notification\n")
+	log.Printf("\nReceived ReplicaReady Notification from %v\n", in.Id)
 	node.replicas_ready += 1
 
 	if node.replicas_ready == node.n_replicas-1 {
-		log.Printf("\nAll replicas have connected.\n")
+
 		node.raft_node_mutex.Unlock()
-		Ready <- true
+
+		// Using defer does not work here
+		go func(node *RaftNode) { node.ready_chan <- true }(node)
+
+		log.Printf("\nAll replicas have connected.\n")
+
 	} else {
 		node.raft_node_mutex.Unlock()
 	}
 
 	return &empty.Empty{}, nil
-
 }
