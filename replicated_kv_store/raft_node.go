@@ -30,7 +30,6 @@ type RaftNode struct {
 	replica_id           int
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.Mutex
-	node_state           RaftNodeState
 
 	// States mentioned in figure 2 of the paper:
 
@@ -59,7 +58,7 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 		replicas_ready:       0,
 		replica_id:           rid,
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		node_state:           Follower, // all nodes are initialized as followers
+		state:                Follower, // all nodes are initialized as followers
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
