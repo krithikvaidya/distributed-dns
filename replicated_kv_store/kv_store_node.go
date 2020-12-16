@@ -86,7 +86,7 @@ func main() {
 
 	<-node.ready_chan // wait until all connections have been established.
 
-	// dummy channel to stall program before exit
+	// dummy channel to stall program before exit. Remove it later
 	all_connected := make(chan bool)
 	<-all_connected
 
