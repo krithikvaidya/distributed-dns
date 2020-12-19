@@ -20,6 +20,15 @@ const (
 	Down
 )
 
+/*
+ * Struct for representing a single log entry. An array of this is stored
+ * on the raft node
+ */
+type LogEntry struct {
+	term int
+	value int
+}
+
 // Main struct storing different aspects of the replica and it's state
 // Refer to figure 2 in the paper
 type RaftNode struct {
@@ -36,7 +45,7 @@ type RaftNode struct {
 	// State to be maintained on all replicas (TODO: persist)
 	currentTerm int
 	votedFor    int
-	log         []int
+	log         []LogEntry
 
 	// State to be maintained on all replicas
 	commitIndex        int
@@ -62,7 +71,7 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
-		log:         make([]int, 10000), // initialized with fixed capacity of 10000, change later.
+		log:         make([]LogEntry, 10000), // initialized with fixed capacity of 10000, change later.
 
 		commitIndex: 0, // index of highest log entry known to be committed.
 		lastApplied: 0, // index of highest log entry applied to state machine.
