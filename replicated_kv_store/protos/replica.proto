@@ -31,6 +31,7 @@ message LogEntry {
 
     int32 term = 1;
     int32 value = 2;
+    repeated string operation = 3;  // [HBEAT/POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
 
 }
 

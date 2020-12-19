@@ -25,8 +25,9 @@ const (
  * on the raft node
  */
 type LogEntry struct {
-	term int
-	value int
+	term      int
+	value     int
+	operation []string
 }
 
 // Main struct storing different aspects of the replica and it's state
