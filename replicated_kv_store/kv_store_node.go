@@ -31,7 +31,7 @@ func main() {
 	fmt.Println("\nRaft-based Replicated Key Value Store\n")
 
 	fmt.Printf("Enter the replica's id: ")
-	var rid int
+	var rid int32
 	fmt.Scanf("%d", &rid)
 
 	fmt.Printf("\nEnter the TCP network address that the replica should bind to (eg - :7890): ")
@@ -50,7 +50,7 @@ func main() {
 
 	rep_addrs := make([]string, n_replica)
 
-	for i := 0; i < n_replica; i++ {
+	for i := int32(0); i < int32(n_replica); i++ {
 
 		if i == rid {
 			continue
@@ -63,7 +63,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	// InitializeNode() is defined in raft_node.go
-	node := InitializeNode(n_replica, rid)
+	node := InitializeNode(int32(n_replica), rid)
 
 	// ConsensusService is defined in protos/replica.proto./
 	// RegisterConsensusServiceServer is present in the generated .pb.go file

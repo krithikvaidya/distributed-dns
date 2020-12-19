@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type RaftNodeState int
+type RaftNodeState int32
 
 const (
 	Follower RaftNodeState = iota
@@ -25,8 +25,8 @@ const (
  * on the raft node
  */
 type LogEntry struct {
-	term      int
-	value     int
+	term      int32
+	value     int32
 	operation []string
 }
 
@@ -35,31 +35,31 @@ type LogEntry struct {
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 	ready_chan           chan bool
-	n_replicas           int
-	replicas_ready       int // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int
+	n_replicas           int32
+	replicas_ready       int32 // number of replicas that have connected to this replica's gRPC server.
+	replica_id           int32
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.Mutex
 
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int
-	votedFor    int
+	currentTerm int32
+	votedFor    int32
 	log         []LogEntry
 
 	// State to be maintained on all replicas
-	commitIndex        int
-	lastApplied        int
+	commitIndex        int32
+	lastApplied        int32
 	state              RaftNodeState
 	electionResetEvent time.Time
 
 	// State to be maintained on the leader
-	nextIndex  []int
-	matchIndex []int
+	nextIndex  []int32
+	matchIndex []int32
 }
 
-func InitializeNode(n_replica int, rid int) *RaftNode {
+func InitializeNode(n_replica int32, rid int32) *RaftNode {
 
 	rn := &RaftNode{
 
@@ -88,7 +88,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	// The clients for each corresponding server is stored in client_objs
 	client_objs := make([]protos.ConsensusServiceClient, node.n_replicas)
 
-	for i := 0; i < node.n_replicas; i++ {
+	for i := int32(0); i < node.n_replicas; i++ {
 
 		if i == node.replica_id {
 			continue
