@@ -2,52 +2,90 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
-	select {
-	case <-ctx.Done():
-		return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: false}, nil
-	default:
-		// term received is lesser than current term
-		if int32(node.currentTerm) > in.Term {
-			return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: false}, nil
-		} else if int32(node.currentTerm) < in.Term { // currect term is lesser than received term, we transition into being a candidate and reset timer and update term
-			node.currentTerm = in.Term
-			node.state = Follower
-			node.electionResetEvent = time.Time{}
-		}
 
-		if in.PrevLogIndex == -1 || node.log[in.PrevLogIndex].term == in.PrevLogTerm && in.PrevLogIndex {
-			logIndex := in.PrevLogIndex + 1
-			entryIndex := 0
-			for entryIndex < len(in.Entries) {
-				// we start from prevlogindex, check if stored values are equal to that in the leader if no, then it updates value and goes ahead doing the same
-				if node.log[logIndex].value != in.Entries[entryIndex].value || node.log[logIndex].term != in.Entries[entryIndex].term {
-					node.log[logIndex].value = in.Entries[entryIndex].value
-					node.log[logIndex].term = in.Entries[entryIndex].term
-					node.log[logIndex].operation = in.Entries[entryIndex].operation
-				}
-				logIndex++
-				entryIndex++
-			}
+	node.raft_node_mutex.Lock()
+	defer raft_node_mutex.Unlock()
 
-			//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-			if in.leaderCommit > node.commitIndex {
-				if in.leaderCommit < in.PrevLogIndex+1 {
-					node.commitIndex = in.leaderCommit
-				} else {
-					node.commitIndex = in.PrevLogIndex
-				}
-			}
-			return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: true}, nil
-		} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-			return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: false}, nil
-		}
+	// term received is lesser than current term
+	if node.currentTerm > in.Term {
+
+		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+
+	} else if node.currentTerm < in.Term {
+
+		// current term is lesser than received term, we transition into being a candidate and reset timer and update term
+		node.becomeFollower(in.Term)
+
+	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {
+
+		// the election for the current term has been won by another replica, and this replica should step down from candidacy
+		node.becomeFollower(in.Term)
 
 	}
-	// ...
+
+	// here we can be sure that the node's current term and the term in the message match.
+
+	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
+	if (in.PrevLogIndex == -1) || ((in.PrevLogIndex < len(node.log)) && (node.log[in.PrevLogIndex].term == in.PrevLogTerm)) {
+
+		logIndex := in.PrevLogIndex + 1
+		entryIndex := 0
+
+		for (entryIndex < len(in.Entries)) && (logIndex < len(node.log)) {
+
+			// we start from prevlogindex and try to find the first mismatch, if any
+			if node.log[logIndex].term != in.Entries[entryIndex].term {
+
+				node.log[logIndex].value = in.Entries[entryIndex].value
+				node.log[logIndex].term = in.Entries[entryIndex].term
+				node.log[logIndex].operation = in.Entries[entryIndex].operation
+
+			}
+
+			logIndex++
+			entryIndex++
+		}
+
+		// at this point, logIndex has either reached the end of the log (or the first conflicting entry), and/or entryIndex has reached the end of the message's entries.
+		// if entryIndex has reached the end, it means that there is nothing new to add to the candidate's log.
+		for ; entryIndex < len(in.Entries); entryIndex++ {
+
+			if logIndex == len(node.log) {
+
+				// add new entry to log
+				node.log = append(node.log, in.Entries[entryIndex])
+
+			} else {
+
+				// overwrite invalidated log entry
+				node.log[logIndex] = in.Entries[entryIndex]
+
+			}
+
+			logIndex++
+
+		}
+
+		//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+		if in.leaderCommit > node.commitIndex {
+			if in.leaderCommit < in.PrevLogIndex+1 {
+				node.commitIndex = in.leaderCommit
+			} else {
+				node.commitIndex = in.PrevLogIndex
+			}
+		}
+
+		return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: true}, nil
+
+	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+
+		return &protos.AppendEntriesResponse{Term: int32(node.currentTerm), Success: false}, nil
+
+	}
+
 }

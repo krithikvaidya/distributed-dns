@@ -26,7 +26,6 @@ const (
  */
 type LogEntry struct {
 	term      int32
-	value     int32
 	operation []string
 }
 
@@ -72,7 +71,7 @@ func InitializeNode(n_replica int32, rid int32) *RaftNode {
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
-		log:         make([]LogEntry, 10000), // initialized with fixed capacity of 10000, change later.
+		// log:         make([]LogEntry, 0), // initialized with fixed capacity of 10000, change later.
 
 		commitIndex: 0, // index of highest log entry known to be committed.
 		lastApplied: 0, // index of highest log entry applied to state machine.

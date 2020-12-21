@@ -30,7 +30,6 @@ message RequestVoteResponse {
 message LogEntry {
 
     int32 term = 1;
-    int32 value = 2;
     repeated string operation = 3;  // [HBEAT/POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
 
 }
@@ -43,9 +42,9 @@ message AppendEntriesMessage {
     int32 prevLogIndex = 3;
     int32 prevLogTerm = 4;
     
-    int32 leaderCommit = 3;
+    int32 leaderCommit = 5;
 
-    repeated LogEntry entries = 5;
+    repeated LogEntry entries = 6;
 
 }
 
