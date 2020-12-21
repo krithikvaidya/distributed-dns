@@ -18,7 +18,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 	if logLen := int32(len(node.log)); logLen > 0 {
 		latestLogIndex = logLen - 1
-		latestLogTerm = node.log[latestLogIndex].term
+		latestLogTerm = node.log[latestLogIndex].Term
 	}
 
 	// If the received message's term is greater than the replica's current term, transition to

@@ -20,15 +20,6 @@ const (
 	Down
 )
 
-/*
- * Struct for representing a single log entry. An array of this is stored
- * on the raft node
- */
-type LogEntry struct {
-	term      int32
-	operation []string
-}
-
 // Main struct storing different aspects of the replica and it's state
 // Refer to figure 2 in the paper
 type RaftNode struct {
@@ -45,7 +36,7 @@ type RaftNode struct {
 	// State to be maintained on all replicas (TODO: persist)
 	currentTerm int32
 	votedFor    int32
-	log         []LogEntry
+	log         []protos.LogEntry
 
 	// State to be maintained on all replicas
 	commitIndex        int32
