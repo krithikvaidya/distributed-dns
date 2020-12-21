@@ -42,6 +42,8 @@ message AppendEntriesMessage {
 
     int32 prevLogIndex = 3;
     int32 prevLogTerm = 4;
+    
+    int32 leaderCommit = 3;
 
     repeated LogEntry entries = 5;
 
