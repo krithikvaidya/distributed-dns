@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"math/rand"
+	"sync/atomic"
 	"time"
+
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 // ToFollower is called when you get a term higher than your own
@@ -53,7 +57,7 @@ func (node *RaftNode) ElectionStopper(start int32) {
 	}
 }
 
-// RunElectionTimer runs an election of no heartbeat is received
+// RunElectionTimer runs an election if no heartbeat is received
 func (node *RaftNode) RunElectionTimer() {
 	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 	//150 - 300 ms random time was mentioned in the paper
@@ -94,4 +98,36 @@ func (node *RaftNode) StartElection() {
 	//requestvote RPC
 	//if election won call ToLeader
 	//else call ToFollower
+	saved_term := node.currentTerm
+	var received_votes int32 = 1
+
+	for _, client_obj := range node.peer_replica_clients {
+		go func(client_obj protos.ConsensusServiceClient) {
+			args := protos.RequestVoteMessage{
+				Term:        saved_term,
+				CandidateId: node.replica_id,
+			}
+			//request vote and get reply
+			response, err := node.RequestVote(context.Background(), &args)
+			if err != nil {
+				if node.state != Candidate {
+					return
+				}
+
+				if response.Term > saved_term { //The response node has higher term than current one
+					node.ToFollower(response.Term)
+					return
+				} else if response.Term == saved_term {
+					if response.VoteGranted {
+						votes := int(atomic.AddInt32(&received_votes, 1))
+						if votes*2 > n_replica { //Won the Election
+							node.ToLeader()
+							return
+						}
+					}
+				}
+			}
+		}(client_obj)
+	}
+	go node.RunElectionTimer()
 }
