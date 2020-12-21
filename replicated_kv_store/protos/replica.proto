@@ -22,6 +22,19 @@ message RequestVoteResponse {
 
 }
 
+/*
+ * This is a format for representing a single log
+ * entry. Each log entry contains the value, and the
+ * term number, when it was added to the leader's log.
+ */
+message LogEntry {
+
+    int32 term = 1;
+    int32 value = 2;
+    repeated string operation = 3;  // [HBEAT/POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
+
+}
+
 message AppendEntriesMessage {
 
     int32 term = 1;
@@ -30,7 +43,7 @@ message AppendEntriesMessage {
     int32 prevLogIndex = 3;
     int32 prevLogTerm = 4;
 
-    repeated int32 entries = 5 [packed=true];
+    repeated LogEntry entries = 5;
 
 }
 

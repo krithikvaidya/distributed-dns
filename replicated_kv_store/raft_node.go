@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type RaftNodeState int
+type RaftNodeState int32
 
 const (
 	Follower RaftNodeState = iota
@@ -20,37 +20,46 @@ const (
 	Down
 )
 
+/*
+ * Struct for representing a single log entry. An array of this is stored
+ * on the raft node
+ */
+type LogEntry struct {
+	term      int32
+	value     int32
+	operation []string
+}
+
 // Main struct storing different aspects of the replica and it's state
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 	ready_chan           chan bool
-	n_replicas           int
-	replicas_ready       int // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int
+	n_replicas           int32
+	replicas_ready       int32 // number of replicas that have connected to this replica's gRPC server.
+	replica_id           int32
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.Mutex
-	node_state           RaftNodeState
 
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int
-	votedFor    int
-	log         []int
+	currentTerm int32
+	votedFor    int32
+	log         []LogEntry
 
 	// State to be maintained on all replicas
-	commitIndex        int
-	lastApplied        int
+	commitIndex        int32
+	lastApplied        int32
 	state              RaftNodeState
 	electionResetEvent time.Time
 
 	// State to be maintained on the leader
-	nextIndex  []int
-	matchIndex []int
+	nextIndex  []int32
+	matchIndex []int32
 }
 
-func InitializeNode(n_replica int, rid int) *RaftNode {
+func InitializeNode(n_replica int32, rid int32) *RaftNode {
 
 	rn := &RaftNode{
 
@@ -59,11 +68,11 @@ func InitializeNode(n_replica int, rid int) *RaftNode {
 		replicas_ready:       0,
 		replica_id:           rid,
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		node_state:           Follower, // all nodes are initialized as followers
+		state:                Follower, // all nodes are initialized as followers
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
-		log:         make([]int, 10000), // initialized with fixed capacity of 10000, change later.
+		log:         make([]LogEntry, 10000), // initialized with fixed capacity of 10000, change later.
 
 		commitIndex: 0, // index of highest log entry known to be committed.
 		lastApplied: 0, // index of highest log entry applied to state machine.
@@ -79,7 +88,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	// The clients for each corresponding server is stored in client_objs
 	client_objs := make([]protos.ConsensusServiceClient, node.n_replicas)
 
-	for i := 0; i < node.n_replicas; i++ {
+	for i := int32(0); i < node.n_replicas; i++ {
 
 		if i == node.replica_id {
 			continue
