@@ -7,11 +7,9 @@ import (
 
 // ToFollower is called when you get a term higher than your own
 func (node *RaftNode) ToFollower(term int32) {
-	node.raft_node_mutex.Lock()
 	node.state = Follower
 	node.currentTerm = term
 	node.votedFor = -1
-	node.raft_node_mutex.Unlock()
 
 	go node.RunElectionTimer()
 	// Once converted to follower
@@ -21,11 +19,9 @@ func (node *RaftNode) ToFollower(term int32) {
 // ToCandidate is called when election timer runs out
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
-	node.raft_node_mutex.Lock()
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.replica_id
-	node.raft_node_mutex.Unlock()
 
 	node.StartElection()
 	//we can start an election for the candidate to become the leader
@@ -33,9 +29,7 @@ func (node *RaftNode) ToCandidate() {
 
 // ToLeader is called when the candidate gets majority votes in election
 func (node *RaftNode) ToLeader() {
-	node.raft_node_mutex.Lock()
 	node.state = Leader
-	node.raft_node_mutex.Unlock()
 
 	go node.HeartBeats()
 }
@@ -47,16 +41,13 @@ func (node *RaftNode) ElectionStopper(start int32) {
 
 	for {
 		<-ticker.C
-		node.raft_node_mutex.Lock()
 		if node.state != Candidate && node.state != Follower {
 			node.stopElectiontimer <- true
-			node.raft_node_mutex.Unlock()
 			return
 		}
 
 		if start != node.currentTerm {
 			node.stopElectiontimer <- true
-			node.raft_node_mutex.Unlock()
 			return
 		}
 	}
@@ -67,9 +58,7 @@ func (node *RaftNode) RunElectionTimer() {
 	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 	//150 - 300 ms random time was mentioned in the paper
 
-	node.raft_node_mutex.Lock()
 	start := node.currentTerm
-	node.raft_node_mutex.Unlock()
 
 	go node.ElectionStopper(start)
 
@@ -91,15 +80,12 @@ func (node *RaftNode) HeartBeats() {
 	defer ticker.Stop()
 
 	for {
-		//call function to send hearbeats to all other nodes
+		//{.....} call function to send hearbeats to all other nodes
 
 		<-ticker.C
-		node.raft_node_mutex.Lock()
 		if node.state != Leader {
-			node.raft_node_mutex.Unlock()
 			return
 		}
-		node.raft_node_mutex.Unlock()
 	}
 }
 
