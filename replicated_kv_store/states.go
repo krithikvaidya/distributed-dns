@@ -6,23 +6,26 @@ import (
 )
 
 // ToFollower is called when you get a term higher than your own
-func (node *RaftNode) ToFollower(term int) {
-	node.node_state = Follower
+func (node *RaftNode) ToFollower(term int32) {
+	node.raft_node_mutex.Lock()
+	node.state = Follower
 	node.currentTerm = term
 	node.votedFor = -1
-	node.electionResetEvent = time.Now()
+	node.raft_node_mutex.Unlock()
 
-	go node.RunElectionTimer() // Once converted to follower
+	go node.RunElectionTimer()
+	// Once converted to follower
 	//we need to run the election timeout in the background
 }
 
 // ToCandidate is called when election timer runs out
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
-	node.node_state = Candidate
+	node.raft_node_mutex.Lock()
+	node.state = Candidate
 	node.currentTerm++
-	node.electionResetEvent = time.Now()
 	node.votedFor = node.replica_id
+	node.raft_node_mutex.Unlock()
 
 	node.StartElection()
 	//we can start an election for the candidate to become the leader
@@ -30,9 +33,33 @@ func (node *RaftNode) ToCandidate() {
 
 // ToLeader is called when the candidate gets majority votes in election
 func (node *RaftNode) ToLeader() {
-	node.node_state = Leader
+	node.raft_node_mutex.Lock()
+	node.state = Leader
+	node.raft_node_mutex.Unlock()
 
 	go node.HeartBeats()
+}
+
+// ElectionStopper writes to the channel when election exit conditions are met
+func (node *RaftNode) ElectionStopper(start int32) {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		node.raft_node_mutex.Lock()
+		if node.state != Candidate && node.state != Follower {
+			node.stopElectiontimer <- true
+			node.raft_node_mutex.Unlock()
+			return
+		}
+
+		if start != node.currentTerm {
+			node.stopElectiontimer <- true
+			node.raft_node_mutex.Unlock()
+			return
+		}
+	}
 }
 
 // RunElectionTimer runs an election of no heartbeat is received
@@ -44,29 +71,16 @@ func (node *RaftNode) RunElectionTimer() {
 	start := node.currentTerm
 	node.raft_node_mutex.Unlock()
 
-	ticker := time.NewTicker(30 * time.Millisecond)
-	defer ticker.Stop()
+	go node.ElectionStopper(start)
 
-	for {
-		<-ticker.C
-		node.raft_node_mutex.Lock()
-		if node.node_state != Candidate && node.node_state != Follower {
-			node.raft_node_mutex.Unlock()
-			return
-		}
-
-		if start != node.currentTerm {
-			node.raft_node_mutex.Unlock()
-			return
-		}
-
-		//If still follower and have not heard from leader nor voted for anyone else
-		if elapsed := time.Since(node.electionResetEvent); elapsed >= duration {
-			node.ToCandidate()
-			node.raft_node_mutex.Unlock()
-			return
-		}
-		node.raft_node_mutex.Unlock()
+	select {
+	case <-time.After(duration): //for timeout to call election
+		node.ToCandidate()
+		return
+	case <-node.stopElectiontimer: //to stop timer
+		return
+	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -78,9 +92,10 @@ func (node *RaftNode) HeartBeats() {
 
 	for {
 		//call function to send hearbeats to all other nodes
+
 		<-ticker.C
 		node.raft_node_mutex.Lock()
-		if node.node_state != Leader {
+		if node.state != Leader {
 			node.raft_node_mutex.Unlock()
 			return
 		}

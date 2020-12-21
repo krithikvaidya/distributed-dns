@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
@@ -49,10 +48,11 @@ type RaftNode struct {
 	log         []LogEntry
 
 	// State to be maintained on all replicas
+	stopElectiontimer  chan bool
+	electionResetEvent chan bool
 	commitIndex        int32
 	lastApplied        int32
 	state              RaftNodeState
-	electionResetEvent time.Time
 
 	// State to be maintained on the leader
 	nextIndex  []int32
