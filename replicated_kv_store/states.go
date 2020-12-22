@@ -48,6 +48,22 @@ func (node *RaftNode) ToLeader() {
 
 	node.state = Leader
 
+	// send no-op for synchronization
+	replica_id := 0
+
+	for _, client_obj := range node.peer_replica_clients {
+
+		if replica_id == node.replica_id {
+			replica_id++
+			continue
+		}
+
+		// initialize nextIndex, matchIndex
+
+		// send no-op
+
+	}
+
 	go node.HeartBeats()
 }
 
@@ -81,6 +97,56 @@ func (node *RaftNode) RunElectionTimer() {
 	}
 }
 
+// Leader sending AppendEntries to all other replicas
+func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage) {
+
+	for _, client_obj := range node.peer_replica_clients {
+
+		if replica_id == node.replica_id {
+			replica_id++
+			continue
+		}
+
+		go func(client_obj protos.ConsensusServiceClient) {
+
+			response, err := cli.AppendEntries(context.Background(), msg)
+			node.raft_node_mutex.Lock()
+			defer raft_node_mutex.Unlock()
+
+			if response.Success == false {
+				
+				if node.state != Leader {
+					return
+				}
+				
+				if response.Term > node.currentTerm {
+					
+					node.ToFollower(response.Term)
+					return
+				}
+			
+			} else {
+
+				if msg_type == "Heartbeat" {
+					return
+				}
+
+				// assuming we are only sending 1 message at a time
+				node.matchIndex[replica_id] = node.nextIndex[replica_id]
+				node.nextIndex[replica_id]++
+				
+			}
+
+		}
+
+		replica_id++
+
+	}
+
+}
+
+
+
 //HeartBeats is a goroutine that periodically makes leader
 //send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
@@ -107,6 +173,17 @@ func (node *RaftNode) HeartBeats() {
 			}
 
 			// send heartbeat
+			hbeat_msg := &protos.AppendEntriesMessage {
+			
+				Term         node.currentTerm,
+				LeaderId     node.replica_id,
+				PrevLogIndex node.nextIndex[replica_id] - 1,
+				PrevLogTerm  node.log[node.nextIndex[replica_id] - 1].Term,
+				LeaderCommit commitIndex,
+				Entries      [],
+
+			}
+			response, err := cli.AppendEntries(context.Background(), &empty.Empty{})
 
 			node.raft_node_mutex.RUnLock()
 
