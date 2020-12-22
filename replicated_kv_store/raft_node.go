@@ -28,7 +28,7 @@ type RaftNode struct {
 	replicas_ready       int32 // number of replicas that have connected to this replica's gRPC server.
 	replica_id           int32
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex      sync.Mutex
+	raft_node_mutex      sync.RWMutex
 
 	// States mentioned in figure 2 of the paper:
 

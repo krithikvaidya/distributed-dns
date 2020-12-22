@@ -21,7 +21,7 @@ func (node *RaftNode) ToFollower(term int32) {
 	// If node was a leader, start election timer. Else if it was a candidate, reset the election timer.
 	if prevState == Leader {
 		go node.RunElectionTimer()
-	} else if prevState == Candidate {
+	} else {
 		node.electionResetEvent <- true
 	}
 
@@ -48,28 +48,38 @@ func (node *RaftNode) ToLeader() {
 
 	node.state = Leader
 
-	replica_id := 0
-
 	// initialize nextIndex, matchIndex
-	for _, client_obj := range node.peer_replica_clients {
+	for replica_id := 0; replica_id < len(node.peer_replica_clients); replica_id++ {
 
-		if replica_id == node.replica_id {
-			replica_id++
+		if int32(replica_id) == node.replica_id {
 			continue
 		}
 
-		nextIndex[replica_id] = len(node.log)
-		matchIndex[replica_id] = 0
+		node.nextIndex[replica_id] = int32(len(node.log))
+		node.matchIndex[replica_id] = int32(0)
 
 	}
 
 	// send no-op for synchronization
-	operation := []string
+	var operation []string
 	operation = append(operation, "NO-OP")
 
 	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
 
-	node.LeaderSendAEs("NO-OP", node.log[len(node.log) - 1], len(node.log) - 1)
+	var entries []*protos.LogEntry
+	entries = append(entries, &node.log[len(node.log)-1])
+
+	msg := &protos.AppendEntriesMessage{
+
+		Term:         node.currentTerm,
+		LeaderId:     node.replica_id,
+		PrevLogIndex: int32(len(node.log) - 1),
+		PrevLogTerm:  node.log[len(node.log)-1].Term,
+		LeaderCommit: node.commitIndex,
+		Entries:      entries,
+	}
+
+	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1))
 
 	go node.HeartBeats()
 }
@@ -78,10 +88,6 @@ func (node *RaftNode) ToLeader() {
 func (node *RaftNode) RunElectionTimer() {
 	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 	//150 - 300 ms random time was mentioned in the paper
-
-	node.raft_node_mutex.Lock()
-	start := node.currentTerm
-	node.raft_node_mutex.Unlock()
 
 	// go node.ElectionStopper(start)
 
@@ -107,16 +113,20 @@ func (node *RaftNode) RunElectionTimer() {
 // To send AppendEntry to single replica, and retry if needed.
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) {
 
-	response, err := cli.AppendEntries(context.Background(), msg)
+	response, _ := client_obj.AppendEntries(context.Background(), msg)
+
+	// if err != nil {
+
+	// }
 
 	if response.Success == false {
-				
+
 		if node.state != Leader {
 			return
 		}
-		
+
 		if response.Term > node.currentTerm {
-			
+
 			node.ToFollower(response.Term)
 			return
 		}
@@ -124,32 +134,44 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		// response.Term <= node.currentTerm and it failed
 
 		node.nextIndex[replica_id]--
-		new_msg := &protos.AppendEntriesMessage {
-			
-			Term         node.currentTerm,
-			LeaderId     node.replica_id,
-			PrevLogIndex msg.PrevLogIndex - 1,
-			PrevLogTerm  node.log[msg.PrevLogIndex - 1].Term,
-			LeaderCommit commitIndex,
-			Entries      node.log[msg.PrevLogIndex:min(upper_index + 1, len(log))],
+		tmp := int32(len(node.log))
 
+		if upper_index+1 < tmp {
+			tmp = upper_index + 1
 		}
 
-		LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
+		var entries []*protos.LogEntry
 
-	
+		for i := msg.PrevLogIndex; i < tmp; i++ {
+			entries = append(entries, &node.log[i])
+		}
+
+		new_msg := &protos.AppendEntriesMessage{
+
+			Term:         node.currentTerm,
+			LeaderId:     node.replica_id,
+			PrevLogIndex: msg.PrevLogIndex - 1,
+			PrevLogTerm:  node.log[msg.PrevLogIndex-1].Term,
+			LeaderCommit: node.commitIndex,
+			Entries:      entries,
+		}
+
+		node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
+
 	} else {
 
 		node.nextIndex[replica_id] = upper_index + 1
 		node.matchIndex[replica_id] = upper_index
-		return 
+		return
 
 	}
 
 }
 
 // Leader sending AppendEntries to all other replicas.
-func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int) {
+func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int32) {
+
+	replica_id := int32(0)
 
 	for _, client_obj := range node.peer_replica_clients {
 
@@ -161,7 +183,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 		go func(client_obj protos.ConsensusServiceClient) {
 
 			node.raft_node_mutex.Lock()
-			defer raft_node_mutex.Unlock()
+			defer node.raft_node_mutex.Unlock()
 
 			node.LeaderSendAE(replica_id, upper_index, client_obj, msg)
 
@@ -172,8 +194,6 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 	}
 
 }
-
-
 
 //HeartBeats is a goroutine that periodically makes leader
 //send heartbeats as long as it is the leader
@@ -193,18 +213,19 @@ func (node *RaftNode) HeartBeats() {
 		replica_id := 0
 
 		// send heartbeat
-		hbeat_msg := &protos.AppendEntriesMessage {
-		
-			Term         node.currentTerm,
-			LeaderId     node.replica_id,
-			PrevLogIndex node.nextIndex[replica_id] - 1,
-			PrevLogTerm  node.log[node.nextIndex[replica_id] - 1].Term,
-			LeaderCommit commitIndex,
-			Entries      [],
+		var entries []*protos.LogEntry
 
+		hbeat_msg := &protos.AppendEntriesMessage{
+
+			Term:         node.currentTerm,
+			LeaderId:     node.replica_id,
+			PrevLogIndex: node.nextIndex[replica_id] - 1,
+			PrevLogTerm:  node.log[node.nextIndex[replica_id]-1].Term,
+			LeaderCommit: node.commitIndex,
+			Entries:      entries,
 		}
-		
-		node.LeaderSendAEs("HBEAT", msg, len(log))
+
+		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)))
 
 	}
 }
@@ -212,10 +233,8 @@ func (node *RaftNode) HeartBeats() {
 // StartElection is called when candidate is ready to start an election
 func (node *RaftNode) StartElection() {
 
-	saved_term := node.currentTerm
-
 	var received_votes int32 = 1
-	replica_id := 0
+	replica_id := int32(0)
 
 	for _, client_obj := range node.peer_replica_clients {
 
@@ -224,10 +243,10 @@ func (node *RaftNode) StartElection() {
 			continue
 		}
 
-		go func(client_obj protos.ConsensusServiceClient) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient) {
 
 			args := protos.RequestVoteMessage{
-				Term:        saved_term,
+				Term:        node.currentTerm,
 				CandidateId: node.replica_id,
 			}
 
@@ -238,18 +257,17 @@ func (node *RaftNode) StartElection() {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 				node.raft_node_mutex.Lock()
+				defer node.raft_node_mutex.Unlock()
 				if node.state != Candidate {
-					node.raft_node_mutex.Unlock()
 					return
 				}
 
-				if response.Term > saved_term { // the response node has higher term than current one
+				if response.Term > node.currentTerm { // the response node has higher term than current one
 
 					node.ToFollower(response.Term)
-					node.raft_node_mutex.Unlock()
 					return
 
-				} else if response.Term == saved_term {
+				} else if response.Term == node.currentTerm {
 
 					if response.VoteGranted {
 
@@ -257,7 +275,6 @@ func (node *RaftNode) StartElection() {
 
 						if votes*2 > n_replica { // won the Election
 							node.ToLeader()
-							node.raft_node_mutex.Unlock()
 							return
 						}
 
@@ -271,7 +288,7 @@ func (node *RaftNode) StartElection() {
 
 			}
 
-		}(client_obj)
+		}(node, client_obj)
 
 		replica_id++
 

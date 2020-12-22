@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -33,7 +32,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		((in.Term > node.currentTerm) && (node.votedFor == -1) &&
 			(in.LastLogTerm > latestLogTerm || ((in.LastLogTerm == latestLogTerm) && (in.LastLogIndex >= latestLogIndex)))) {
 
-		node.electionResetEvent = time.Time{}
+		node.electionResetEvent <- true
 		node.votedFor = in.CandidateId
 
 		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
