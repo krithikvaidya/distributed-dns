@@ -180,14 +180,14 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(client_obj protos.ConsensusServiceClient) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient) {
 
 			node.raft_node_mutex.Lock()
 			defer node.raft_node_mutex.Unlock()
 
 			node.LeaderSendAE(replica_id, upper_index, client_obj, msg)
 
-		}(client_obj)
+		}(node, client_obj)
 
 		replica_id++
 
