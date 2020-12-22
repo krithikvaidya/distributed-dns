@@ -48,9 +48,9 @@ func (node *RaftNode) ToLeader() {
 
 	node.state = Leader
 
-	// send no-op for synchronization
 	replica_id := 0
 
+	// initialize nextIndex, matchIndex
 	for _, client_obj := range node.peer_replica_clients {
 
 		if replica_id == node.replica_id {
@@ -58,11 +58,18 @@ func (node *RaftNode) ToLeader() {
 			continue
 		}
 
-		// initialize nextIndex, matchIndex
-
-		// send no-op
+		nextIndex[replica_id] = len(node.log)
+		matchIndex[replica_id] = 0
 
 	}
+
+	// send no-op for synchronization
+	operation := []string
+	operation = append(operation, "NO-OP")
+
+	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+
+	node.LeaderSendAEs("NO-OP", node.log[len(node.log) - 1], len(node.log) - 1)
 
 	go node.HeartBeats()
 }
@@ -97,8 +104,52 @@ func (node *RaftNode) RunElectionTimer() {
 	}
 }
 
-// Leader sending AppendEntries to all other replicas
-func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage) {
+// To send AppendEntry to single replica, and retry if needed.
+func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) {
+
+	response, err := cli.AppendEntries(context.Background(), msg)
+
+	if response.Success == false {
+				
+		if node.state != Leader {
+			return
+		}
+		
+		if response.Term > node.currentTerm {
+			
+			node.ToFollower(response.Term)
+			return
+		}
+
+		// response.Term <= node.currentTerm and it failed
+
+		node.nextIndex[replica_id]--
+		new_msg := &protos.AppendEntriesMessage {
+			
+			Term         node.currentTerm,
+			LeaderId     node.replica_id,
+			PrevLogIndex msg.PrevLogIndex - 1,
+			PrevLogTerm  node.log[msg.PrevLogIndex - 1].Term,
+			LeaderCommit commitIndex,
+			Entries      node.log[msg.PrevLogIndex:min(upper_index + 1, len(log))],
+
+		}
+
+		LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
+
+	
+	} else {
+
+		node.nextIndex[replica_id] = upper_index + 1
+		node.matchIndex[replica_id] = upper_index
+		return 
+
+	}
+
+}
+
+// Leader sending AppendEntries to all other replicas.
+func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int) {
 
 	for _, client_obj := range node.peer_replica_clients {
 
@@ -109,35 +160,12 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 		go func(client_obj protos.ConsensusServiceClient) {
 
-			response, err := cli.AppendEntries(context.Background(), msg)
 			node.raft_node_mutex.Lock()
 			defer raft_node_mutex.Unlock()
 
-			if response.Success == false {
-				
-				if node.state != Leader {
-					return
-				}
-				
-				if response.Term > node.currentTerm {
-					
-					node.ToFollower(response.Term)
-					return
-				}
-			
-			} else {
+			node.LeaderSendAE(replica_id, upper_index, client_obj, msg)
 
-				if msg_type == "Heartbeat" {
-					return
-				}
-
-				// assuming we are only sending 1 message at a time
-				node.matchIndex[replica_id] = node.nextIndex[replica_id]
-				node.nextIndex[replica_id]++
-				
-			}
-
-		}
+		}(client_obj)
 
 		replica_id++
 
@@ -162,32 +190,21 @@ func (node *RaftNode) HeartBeats() {
 			return
 		}
 
-		node.raft_node_mutex.RLock()
 		replica_id := 0
 
-		for _, client_obj := range node.peer_replica_clients {
-
-			if replica_id == node.replica_id {
-				replica_id++
-				continue
-			}
-
-			// send heartbeat
-			hbeat_msg := &protos.AppendEntriesMessage {
-			
-				Term         node.currentTerm,
-				LeaderId     node.replica_id,
-				PrevLogIndex node.nextIndex[replica_id] - 1,
-				PrevLogTerm  node.log[node.nextIndex[replica_id] - 1].Term,
-				LeaderCommit commitIndex,
-				Entries      [],
-
-			}
-			response, err := cli.AppendEntries(context.Background(), &empty.Empty{})
-
-			node.raft_node_mutex.RUnLock()
+		// send heartbeat
+		hbeat_msg := &protos.AppendEntriesMessage {
+		
+			Term         node.currentTerm,
+			LeaderId     node.replica_id,
+			PrevLogIndex node.nextIndex[replica_id] - 1,
+			PrevLogTerm  node.log[node.nextIndex[replica_id] - 1].Term,
+			LeaderCommit commitIndex,
+			Entries      [],
 
 		}
+		
+		node.LeaderSendAEs("HBEAT", msg, len(log))
 
 	}
 }

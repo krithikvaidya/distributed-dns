@@ -30,7 +30,7 @@ message RequestVoteResponse {
 message LogEntry {
 
     int32 term = 1;
-    repeated string operation = 3;  // [HBEAT/POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
+    repeated string operation = 3;  // [POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
 
 }
 
