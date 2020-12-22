@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -11,50 +12,43 @@ import (
 
 // ToFollower is called when you get a term higher than your own
 func (node *RaftNode) ToFollower(term int32) {
+
+	prevState := node.state
 	node.state = Follower
 	node.currentTerm = term
 	node.votedFor = -1
 
-	go node.RunElectionTimer()
-	// Once converted to follower
-	//we need to run the election timeout in the background
+	// If node was a leader, start election timer. Else if it was a candidate, reset the election timer.
+	if prevState == Leader {
+		go node.RunElectionTimer()
+	} else if prevState == Candidate {
+		node.electionResetEvent <- true
+	}
+
 }
 
 // ToCandidate is called when election timer runs out
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
+
+	node.raft_node_mutex.Lock()
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.replica_id
 
-	node.StartElection()
 	//we can start an election for the candidate to become the leader
+	node.StartElection()
 }
 
 // ToLeader is called when the candidate gets majority votes in election
 func (node *RaftNode) ToLeader() {
+
+	// stop election timer since leader doesn't need it
+	node.stopElectiontimer <- true
+
 	node.state = Leader
 
 	go node.HeartBeats()
-}
-
-// ElectionStopper writes to the channel when election exit conditions are met
-func (node *RaftNode) ElectionStopper(start int32) {
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		<-ticker.C
-		if node.state != Candidate && node.state != Follower {
-			node.stopElectiontimer <- true
-			return
-		}
-
-		if start != node.currentTerm {
-			node.stopElectiontimer <- true
-			return
-		}
-	}
 }
 
 // RunElectionTimer runs an election if no heartbeat is received
@@ -62,72 +56,133 @@ func (node *RaftNode) RunElectionTimer() {
 	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 	//150 - 300 ms random time was mentioned in the paper
 
+	node.raft_node_mutex.Lock()
 	start := node.currentTerm
+	node.raft_node_mutex.Unlock()
 
-	go node.ElectionStopper(start)
+	// go node.ElectionStopper(start)
 
 	select {
+
 	case <-time.After(duration): //for timeout to call election
+
+		// if node was a follower, transition to candidate and start election
+		// if node was already candidate, restart election
 		node.ToCandidate()
 		return
+
 	case <-node.stopElectiontimer: //to stop timer
 		return
+
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
-		time.Sleep(1 * time.Second)
+		go node.RunElectionTimer()
+		return
+
 	}
 }
 
 //HeartBeats is a goroutine that periodically makes leader
 //send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
+
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
-		//{.....} call function to send hearbeats to all other nodes
 
 		<-ticker.C
+
 		if node.state != Leader {
 			return
 		}
+
+		node.raft_node_mutex.RLock()
+		replica_id := 0
+
+		for _, client_obj := range node.peer_replica_clients {
+
+			if replica_id == node.replica_id {
+				replica_id++
+				continue
+			}
+
+			// send heartbeat
+
+			node.raft_node_mutex.RUnLock()
+
+		}
+
 	}
 }
 
 // StartElection is called when candidate is ready to start an election
 func (node *RaftNode) StartElection() {
-	//requestvote RPC
-	//if election won call ToLeader
-	//else call ToFollower
+
 	saved_term := node.currentTerm
+
 	var received_votes int32 = 1
+	replica_id := 0
 
 	for _, client_obj := range node.peer_replica_clients {
+
+		if replica_id == node.replica_id {
+			replica_id++
+			continue
+		}
+
 		go func(client_obj protos.ConsensusServiceClient) {
+
 			args := protos.RequestVoteMessage{
 				Term:        saved_term,
 				CandidateId: node.replica_id,
 			}
+
 			//request vote and get reply
-			response, err := node.RequestVote(context.Background(), &args)
+			response, err := client_obj.RequestVote(context.Background(), &args)
+
 			if err != nil {
+
+				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
+				node.raft_node_mutex.Lock()
 				if node.state != Candidate {
+					node.raft_node_mutex.Unlock()
 					return
 				}
 
-				if response.Term > saved_term { //The response node has higher term than current one
+				if response.Term > saved_term { // the response node has higher term than current one
+
 					node.ToFollower(response.Term)
+					node.raft_node_mutex.Unlock()
 					return
+
 				} else if response.Term == saved_term {
+
 					if response.VoteGranted {
+
 						votes := int(atomic.AddInt32(&received_votes, 1))
-						if votes*2 > n_replica { //Won the Election
+
+						if votes*2 > n_replica { // won the Election
 							node.ToLeader()
+							node.raft_node_mutex.Unlock()
 							return
 						}
+
 					}
+
 				}
+
+			} else {
+
+				log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
+
 			}
+
 		}(client_obj)
+
+		replica_id++
+
 	}
-	go node.RunElectionTimer()
+
+	node.raft_node_mutex.Unlock() // was locked in ToCandidate()
+	go node.RunElectionTimer()    // begin the timer during which this candidate waits for votes
 }

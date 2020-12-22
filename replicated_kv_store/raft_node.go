@@ -68,6 +68,8 @@ func InitializeNode(n_replica int32, rid int32) *RaftNode {
 		lastApplied: 0, // index of highest log entry applied to state machine.
 	}
 
+	go rn.RunElectionTimer()
+
 	return rn
 
 }
