@@ -273,7 +273,7 @@ func (node *RaftNode) StartElection() {
 
 						votes := int(atomic.AddInt32(&received_votes, 1))
 
-						if votes*2 > n_replica { // won the Election
+						if votes*2 > int(node.n_replicas) { // won the Election
 							node.ToLeader()
 							return
 						}

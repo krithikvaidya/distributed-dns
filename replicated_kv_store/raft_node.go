@@ -23,30 +23,30 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	ready_chan           chan bool
-	n_replicas           int32
+	ready_chan           chan bool // Channel to signal whether the node is ready for operation
+	n_replicas           int32 // The number of replicas in the current replicated system
 	replicas_ready       int32 // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int32
+	replica_id           int32 // The unique ID for the current replica
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex      sync.RWMutex
+	raft_node_mutex      sync.RWMutex // The mutex for working with the RaftNode struct
 
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int32
-	votedFor    int32
-	log         []protos.LogEntry
+	currentTerm int32 // Latest term server has seen
+	votedFor    int32 // Candidate ID of the node that received vote from current node in the latest term
+	log         []protos.LogEntry // The array of the log entry structs
 
 	// State to be maintained on all replicas
-	stopElectiontimer  chan bool
-	electionResetEvent chan bool
-	commitIndex        int32
-	lastApplied        int32
-	state              RaftNodeState
+	stopElectiontimer  chan bool // Channel to signal for stopping the election timer for the node
+	electionResetEvent chan bool // Channel to signal for resetting the election timer for the node
+	commitIndex        int32 // Index of the highest long entry known to be committed
+	lastApplied        int32 // Index of the highest log entry applied to the state machine
+	state              RaftNodeState // The current state of the node(eg. Candidate, Leader, etc)
 
 	// State to be maintained on the leader
-	nextIndex  []int32
-	matchIndex []int32
+	nextIndex  []int32 // Indices of the next log entry to send to each server
+	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 }
 
 func InitializeNode(n_replica int32, rid int32) *RaftNode {
@@ -64,8 +64,10 @@ func InitializeNode(n_replica int32, rid int32) *RaftNode {
 		votedFor:    -1,
 		// log:         make([]LogEntry, 0), // initialized with fixed capacity of 10000, change later.
 
-		commitIndex: 0, // index of highest log entry known to be committed.
-		lastApplied: 0, // index of highest log entry applied to state machine.
+		stopElectiontimer:  make(chan bool),
+		electionResetEvent: make(chan bool),
+		commitIndex:        0, // index of highest log entry known to be committed.
+		lastApplied:        0, // index of highest log entry applied to state machine.
 	}
 
 	go rn.RunElectionTimer()
