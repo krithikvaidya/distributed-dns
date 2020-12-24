@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"time"
+	"testing"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
@@ -16,6 +17,14 @@ import (
 var n_replica int
 
 func init() {
+
+	/* 
+	 * Workaround for a Go bug
+	 * The Init() function for the testing package should be called
+	 * before our init() function for parsing the command-line arguments
+	 * of the `go test` command
+	 */
+	testing.Init()
 
 	// Command line parameters
 	flag.IntVar(&n_replica, "n", 5, "total number of replicas (default=5)")
@@ -28,7 +37,7 @@ func init() {
 
 func main() {
 
-	fmt.Println("\nRaft-based Replicated Key Value Store\n")
+	fmt.Println("\nRaft-based Replicated Key Value Store")
 
 	fmt.Printf("Enter the replica's id: ")
 	var rid int32
