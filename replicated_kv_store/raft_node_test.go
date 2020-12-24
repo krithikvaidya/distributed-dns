@@ -1,9 +1,9 @@
 package main
 
 import (
-	"testing"
-	"fmt"
 	"bytes"
+	"fmt"
+	"testing"
 )
 
 /*
@@ -19,9 +19,11 @@ func TestInitializeNode(t *testing.T) {
 	 * the replica ID
 	 */
 	var no_of_replicas, replica_id int32
+	var replica_key_value_port string
 	no_of_replicas = 5
 	replica_id = 1
-	node := InitializeNode(no_of_replicas, replica_id)
+	replica_key_value_port = ":8081"
+	node := InitializeNode(no_of_replicas, replica_id, replica_key_value_port)
 
 	// Here, we check every member of the RaftNode struct
 

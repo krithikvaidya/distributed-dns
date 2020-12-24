@@ -24,13 +24,14 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
-	n_replicas           int32                           // The number of replicas in the current replicated system
-	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int32                           // The unique ID for the current replica
-	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
-	electionTimerRunning bool
+	ready_chan               chan bool                       // Channel to signal whether the node is ready for operation
+	n_replicas               int32                           // The number of replicas in the current replicated system
+	replicas_ready           int32                           // number of replicas that have connected to this replica's gRPC server.
+	replica_id               int32                           // The unique ID for the current replica
+	peer_replica_clients     []protos.ConsensusServiceClient // client objects to send messages to other peers
+	raft_node_mutex          sync.RWMutex                    // The mutex for working with the RaftNode struct
+	electionTimerRunning     bool
+	replicated_keyvaluestore string //to store respective port on which replicated key value store is running
 
 	// States mentioned in figure 2 of the paper:
 
@@ -51,17 +52,18 @@ type RaftNode struct {
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 }
 
-func InitializeNode(n_replica int32, rid int32) *RaftNode {
+func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode {
 
 	rn := &RaftNode{
 
-		n_replicas:           n_replica,
-		ready_chan:           make(chan bool),
-		replicas_ready:       0,
-		replica_id:           rid,
-		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		state:                Follower, // all nodes are initialized as followers
-		electionTimerRunning: false,
+		n_replicas:               n_replica,
+		ready_chan:               make(chan bool),
+		replicas_ready:           0,
+		replica_id:               rid,
+		peer_replica_clients:     make([]protos.ConsensusServiceClient, n_replica),
+		state:                    Follower, // all nodes are initialized as followers
+		electionTimerRunning:     false,
+		replicated_keyvaluestore: keyvalue_port,
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
