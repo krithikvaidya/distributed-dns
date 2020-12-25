@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
@@ -18,7 +18,7 @@ var n_replica int
 
 func init() {
 
-	/* 
+	/*
 	 * Workaround for a Go bug
 	 * The Init() function for the testing package should be called
 	 * before our init() function for parsing the command-line arguments
@@ -97,9 +97,15 @@ func main() {
 	fmt.Scanf("%c", &input)
 
 	// Attempt to gRPC dial to other replicas. ConnectToPeerReplicas is defined in raft_node.go
+	fmt.Printf("\nAttempting to connect to peer replicas...\n")
 	node.ConnectToPeerReplicas(rep_addrs)
+	log.Printf("\nSuccessfully connected to peer replicas.\n")
 
-	<-node.ready_chan // wait until all connections have been established.
+	<-node.ready_chan // wait until all connections to our have been established.
+	log.Printf("\nAll peer replicas have successfully connected.\n")
+
+	// this goroutine will keep monitoring all connections and try to re-establish connections that die
+	// go node.MonitorConnections()
 
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)

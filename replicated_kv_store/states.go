@@ -22,7 +22,9 @@ func (node *RaftNode) ToFollower(term int32) {
 	if prevState == Leader {
 		go node.RunElectionTimer()
 	} else {
-		node.electionResetEvent <- true
+		if node.electionTimerRunning {
+			node.electionResetEvent <- true
+		}
 	}
 
 }
@@ -31,7 +33,10 @@ func (node *RaftNode) ToFollower(term int32) {
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
 
+	// log.Printf("\nIn ToCandidate\n")
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nObtained ToCandidate Lock\n")
+
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.replica_id
@@ -81,6 +86,7 @@ func (node *RaftNode) ToLeader() {
 
 	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1))
 
+	log.Printf("\nbecame leader\n")
 	go node.HeartBeats()
 }
 
@@ -253,7 +259,7 @@ func (node *RaftNode) StartElection() {
 			//request vote and get reply
 			response, err := client_obj.RequestVote(context.Background(), &args)
 
-			if err != nil {
+			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 				node.raft_node_mutex.Lock()
@@ -295,5 +301,7 @@ func (node *RaftNode) StartElection() {
 	}
 
 	node.raft_node_mutex.Unlock() // was locked in ToCandidate()
-	go node.RunElectionTimer()    // begin the timer during which this candidate waits for votes
+	// log.Printf("\nPerformed ToCandidate Unlock\n")
+
+	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 }

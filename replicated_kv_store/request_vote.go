@@ -8,8 +8,10 @@ import (
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
+	// fmt.Printf("\nreceived requestvote\n")
+
+	// log.Printf("\nIn RequestVote. rw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
 
 	node_current_term := node.currentTerm
 	latestLogIndex := int32(-1)
@@ -35,10 +37,12 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		node.electionResetEvent <- true
 		node.votedFor = in.CandidateId
 
+		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
 
 	} else {
 
+		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
 
 	}
