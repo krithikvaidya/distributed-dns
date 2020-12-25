@@ -251,9 +251,19 @@ func (node *RaftNode) StartElection() {
 
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient) {
 
+			latestLogIndex := int32(-1)
+			latestLogTerm := int32(-1)
+
+			if logLen := int32(len(node.log)); logLen > 0 {
+				latestLogIndex = logLen - 1
+				latestLogTerm = node.log[latestLogIndex].Term
+			}
+
 			args := protos.RequestVoteMessage{
-				Term:        node.currentTerm,
-				CandidateId: node.replica_id,
+				Term:         node.currentTerm,
+				CandidateId:  node.replica_id,
+				LastLogIndex: latestLogIndex,
+				LastLogTerm:  latestLogTerm,
 			}
 
 			//request vote and get reply
