@@ -48,10 +48,14 @@ func (node *RaftNode) ToCandidate() {
 // ToLeader is called when the candidate gets majority votes in election
 func (node *RaftNode) ToLeader() {
 
+	log.Printf("\nTransitioned to leader\n")
 	// stop election timer since leader doesn't need it
 	node.stopElectiontimer <- true
 
 	node.state = Leader
+
+	node.nextIndex = make([]int32, node.n_replicas, node.n_replicas)
+	node.matchIndex = make([]int32, node.n_replicas, node.n_replicas)
 
 	// initialize nextIndex, matchIndex
 	for replica_id := 0; replica_id < len(node.peer_replica_clients); replica_id++ {
@@ -66,6 +70,16 @@ func (node *RaftNode) ToLeader() {
 	}
 
 	// send no-op for synchronization
+	// first obtain prevLogIndex and prevLogTerm
+
+	prevLogIndex := int32(-1)
+	prevLogTerm := int32(-1)
+
+	if logLen := int32(len(node.log)); logLen > 0 {
+		prevLogIndex = logLen - 1
+		prevLogTerm = node.log[prevLogIndex].Term
+	}
+
 	var operation []string
 	operation = append(operation, "NO-OP")
 
@@ -78,15 +92,14 @@ func (node *RaftNode) ToLeader() {
 
 		Term:         node.currentTerm,
 		LeaderId:     node.replica_id,
-		PrevLogIndex: int32(len(node.log) - 1),
-		PrevLogTerm:  node.log[len(node.log)-1].Term,
+		PrevLogIndex: prevLogIndex,
+		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
 	}
 
 	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1))
 
-	log.Printf("\nbecame leader\n")
 	go node.HeartBeats()
 }
 
@@ -119,11 +132,11 @@ func (node *RaftNode) RunElectionTimer() {
 // To send AppendEntry to single replica, and retry if needed.
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) {
 
-	response, _ := client_obj.AppendEntries(context.Background(), msg)
+	response, err := client_obj.AppendEntries(context.Background(), msg)
 
-	// if err != nil {
-
-	// }
+	if err != nil {
+		// ...
+	}
 
 	if response.Success == false {
 
@@ -137,7 +150,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			return
 		}
 
-		// response.Term <= node.currentTerm and it failed
+		// will reach here if response.Term <= node.currentTerm and response.Success == false
 
 		node.nextIndex[replica_id]--
 		tmp := int32(len(node.log))
@@ -179,6 +192,10 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	replica_id := int32(0)
 
+	// node.raft_node_mutex.RLock() // for node.peer_replica_clients.
+	// defer node.raft_node_mutex.RUnlock()
+	// (The above are not required, since in the current implementation it doesnt change after initialization)
+
 	for _, client_obj := range node.peer_replica_clients {
 
 		if replica_id == node.replica_id {
@@ -186,14 +203,14 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(node *RaftNode, client_obj protos.ConsensusServiceClient) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32) {
 
 			node.raft_node_mutex.Lock()
 			defer node.raft_node_mutex.Unlock()
 
 			node.LeaderSendAE(replica_id, upper_index, client_obj, msg)
 
-		}(node, client_obj)
+		}(node, client_obj, replica_id, upper_index)
 
 		replica_id++
 
@@ -212,11 +229,20 @@ func (node *RaftNode) HeartBeats() {
 
 		<-ticker.C
 
+		node.raft_node_mutex.RLock()
+
 		if node.state != Leader {
 			return
 		}
 
 		replica_id := 0
+
+		prevLogIndex := node.nextIndex[replica_id] - 1
+		prevLogTerm := int32(-1)
+
+		if prevLogIndex >= 0 {
+			prevLogTerm = node.log[prevLogIndex].Term
+		}
 
 		// send heartbeat
 		var entries []*protos.LogEntry
@@ -225,13 +251,14 @@ func (node *RaftNode) HeartBeats() {
 
 			Term:         node.currentTerm,
 			LeaderId:     node.replica_id,
-			PrevLogIndex: node.nextIndex[replica_id] - 1,
-			PrevLogTerm:  node.log[node.nextIndex[replica_id]-1].Term,
+			PrevLogIndex: prevLogIndex,
+			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
 		}
 
 		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)))
+		node.raft_node_mutex.RUnlock()
 
 	}
 }
