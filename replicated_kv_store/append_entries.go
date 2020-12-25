@@ -9,11 +9,11 @@ import (
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
 
 	// term received is lesser than current term
 	if node.currentTerm > in.Term {
 
+		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
@@ -81,10 +81,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			}
 		}
 
+		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
+		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	}

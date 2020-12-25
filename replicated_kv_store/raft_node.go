@@ -164,7 +164,7 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 		// Using defer does not work here. Not sure why
 		go func(node *RaftNode) {
 
-			log.Printf("\nIn ready chan send goroutine\n")
+			// log.Printf("\nIn ready chan send goroutine\n")
 			node.ready_chan <- true
 
 		}(node)

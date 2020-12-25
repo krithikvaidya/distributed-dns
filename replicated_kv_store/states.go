@@ -20,6 +20,7 @@ func (node *RaftNode) ToFollower(term int32) {
 
 	// If node was a leader, start election timer. Else if it was a candidate, reset the election timer.
 	if prevState == Leader {
+		node.electionTimerRunning = true
 		go node.RunElectionTimer()
 	} else {
 		if node.electionTimerRunning {
@@ -32,10 +33,6 @@ func (node *RaftNode) ToFollower(term int32) {
 // ToCandidate is called when election timer runs out
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
-
-	// log.Printf("\nIn ToCandidate\n")
-	node.raft_node_mutex.Lock()
-	// log.Printf("\nObtained ToCandidate Lock\n")
 
 	node.state = Candidate
 	node.currentTerm++
@@ -51,6 +48,7 @@ func (node *RaftNode) ToLeader() {
 	log.Printf("\nTransitioned to leader\n")
 	// stop election timer since leader doesn't need it
 	node.stopElectiontimer <- true
+	node.electionTimerRunning = false
 
 	node.state = Leader
 
@@ -116,7 +114,12 @@ func (node *RaftNode) RunElectionTimer() {
 
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
+		node.raft_node_mutex.Lock()
+
+		node.electionTimerRunning = false
 		node.ToCandidate()
+
+		node.raft_node_mutex.Unlock()
 		return
 
 	case <-node.stopElectiontimer: //to stop timer
@@ -132,6 +135,7 @@ func (node *RaftNode) RunElectionTimer() {
 // To send AppendEntry to single replica, and retry if needed.
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) {
 
+	log.Printf("\n leader send ae \n")
 	response, err := client_obj.AppendEntries(context.Background(), msg)
 
 	if err != nil {
@@ -206,9 +210,8 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32) {
 
 			node.raft_node_mutex.Lock()
-			defer node.raft_node_mutex.Unlock()
-
 			node.LeaderSendAE(replica_id, upper_index, client_obj, msg)
+			node.raft_node_mutex.Unlock()
 
 		}(node, client_obj, replica_id, upper_index)
 
@@ -222,7 +225,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 //send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(50000 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -337,8 +340,6 @@ func (node *RaftNode) StartElection() {
 
 	}
 
-	node.raft_node_mutex.Unlock() // was locked in ToCandidate()
-	// log.Printf("\nPerformed ToCandidate Unlock\n")
-
 	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
+	node.electionTimerRunning = false
 }
