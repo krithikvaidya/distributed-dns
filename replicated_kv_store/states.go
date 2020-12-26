@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -26,7 +27,9 @@ func (node *RaftNode) ToFollower(term int32) {
 	if prevState == Leader {
 		go node.RunElectionTimer()
 	} else {
-		node.electionResetEvent <- true
+		if node.electionTimerRunning {
+			node.electionResetEvent <- true
+		}
 	}
 
 }
@@ -35,7 +38,10 @@ func (node *RaftNode) ToFollower(term int32) {
 // without heartbeat from leader
 func (node *RaftNode) ToCandidate() {
 
+	// log.Printf("\nIn ToCandidate\n")
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nObtained ToCandidate Lock\n")
+
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.replica_id
@@ -85,6 +91,7 @@ func (node *RaftNode) ToLeader() {
 
 	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1))
 
+	log.Printf("\nbecame leader\n")
 	go node.HeartBeats()
 }
 
@@ -249,15 +256,25 @@ func (node *RaftNode) StartElection() {
 
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient) {
 
+			latestLogIndex := int32(-1)
+			latestLogTerm := int32(-1)
+
+			if logLen := int32(len(node.log)); logLen > 0 {
+				latestLogIndex = logLen - 1
+				latestLogTerm = node.log[latestLogIndex].Term
+			}
+
 			args := protos.RequestVoteMessage{
-				Term:        node.currentTerm,
-				CandidateId: node.replica_id,
+				Term:         node.currentTerm,
+				CandidateId:  node.replica_id,
+				LastLogIndex: latestLogIndex,
+				LastLogTerm:  latestLogTerm,
 			}
 
 			//request vote and get reply
 			response, err := client_obj.RequestVote(context.Background(), &args)
 
-			if err != nil {
+			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 				node.raft_node_mutex.Lock()
@@ -299,7 +316,9 @@ func (node *RaftNode) StartElection() {
 	}
 
 	node.raft_node_mutex.Unlock() // was locked in ToCandidate()
-	go node.RunElectionTimer()    // begin the timer during which this candidate waits for votes
+	// log.Printf("\nPerformed ToCandidate Unlock\n")
+
+	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 }
 
 func (node *RaftNode) Writeto() {
@@ -308,7 +327,7 @@ func (node *RaftNode) Writeto() {
 		node.raft_node_mutex.Lock()
 		//savedTerm := node.currentTerm
 		//savedLastApplied := node.lastApplied
-		var entries []LogEntry
+		var entries []protos.LogEntry
 		if node.commitIndex > node.lastApplied {
 			entries = node.log[node.lastApplied+1 : node.commitIndex+1]
 			node.lastApplied = node.commitIndex
@@ -317,21 +336,21 @@ func (node *RaftNode) Writeto() {
 
 		for _, entry := range entries {
 			formData := url.Values{
-				"value": {entry.operation[2]},
+				"value": {entry.Operation[2]},
 			}
 
 			timeout := time.Duration(5 * time.Second)
 			client := http.Client{
 				Timeout: timeout,
 			}
-
-			switch entry.operation[0] {
+			Oper := strings.ToLower(entry.Operation[0])
+			switch Oper {
 			case "push":
 				formData := url.Values{
-					"value": {entry.operation[2]},
+					"value": {entry.Operation[2]},
 				}
 
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(formData.Encode()))
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				CheckError(err)
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
@@ -342,7 +361,7 @@ func (node *RaftNode) Writeto() {
 
 			case "put":
 
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(formData.Encode()))
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				CheckError(err)
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
@@ -352,7 +371,7 @@ func (node *RaftNode) Writeto() {
 				break
 
 			case "delete":
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(""))
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(""))
 				CheckError(err)
 
 				resp, err := client.Do(req)
