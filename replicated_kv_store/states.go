@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -296,4 +300,70 @@ func (node *RaftNode) StartElection() {
 
 	node.raft_node_mutex.Unlock() // was locked in ToCandidate()
 	go node.RunElectionTimer()    // begin the timer during which this candidate waits for votes
+}
+
+func (node *RaftNode) Writeto() {
+	for range node.newCommitReadyChan {
+		// Find which entries we have to apply.
+		node.raft_node_mutex.Lock()
+		//savedTerm := node.currentTerm
+		//savedLastApplied := node.lastApplied
+		var entries []LogEntry
+		if node.commitIndex > node.lastApplied {
+			entries = node.log[node.lastApplied+1 : node.commitIndex+1]
+			node.lastApplied = node.commitIndex
+		}
+		node.raft_node_mutex.Unlock()
+
+		for _, entry := range entries {
+			formData := url.Values{
+				"value": {entry.operation[2]},
+			}
+
+			timeout := time.Duration(5 * time.Second)
+			client := http.Client{
+				Timeout: timeout,
+			}
+
+			switch entry.operation[0] {
+			case "push":
+				formData := url.Values{
+					"value": {entry.operation[2]},
+				}
+
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(formData.Encode()))
+				CheckError(err)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "put":
+
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(formData.Encode()))
+				CheckError(err)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "delete":
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:8080/%s", entry.operation[1]), bytes.NewBufferString(""))
+				CheckError(err)
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "no-op":
+				break
+			}
+
+		}
+	}
 }

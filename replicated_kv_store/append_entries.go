@@ -79,6 +79,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
+			node.newCommitReadyChan <- struct{}{}
 		}
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
