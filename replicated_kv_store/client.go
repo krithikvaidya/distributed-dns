@@ -29,7 +29,9 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 
 		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1))
 
-		return true
+		val := <-node.successfulwrite //Written to from AE when majority of nodes have replicated the write
+
+		return val
 	}
 
 	return false
