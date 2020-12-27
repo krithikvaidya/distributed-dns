@@ -331,6 +331,9 @@ func (node *RaftNode) Writeto() {
 		if node.commitIndex > node.lastApplied {
 			entries = node.log[node.lastApplied+1 : node.commitIndex+1]
 			node.lastApplied = node.commitIndex
+			log.Printf("Operations to be applied to kv_store\n")
+		} else {
+			return
 		}
 		node.raft_node_mutex.Unlock()
 
@@ -339,7 +342,7 @@ func (node *RaftNode) Writeto() {
 				"value": {entry.Operation[2]},
 			}
 
-			timeout := time.Duration(5 * time.Second)
+			timeout := time.Duration(100 * time.Microsecond)
 			client := http.Client{
 				Timeout: timeout,
 			}
@@ -384,5 +387,6 @@ func (node *RaftNode) Writeto() {
 			}
 
 		}
+		log.Println("Required Operations done to kv_store; In-sync")
 	}
 }
