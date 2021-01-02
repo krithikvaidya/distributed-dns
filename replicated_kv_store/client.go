@@ -44,10 +44,10 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 // ReadCommand is different since read operations do not need to be added to log
 func (node *RaftNode) ReadCommand(key int) bool {
 
-	node.StaleReadCheck()
-
 	node.raft_node_mutex.RLock()
 	defer node.raft_node_mutex.RUnlock()
+
+	node.StaleReadCheck()
 
 	if node.state == Leader {
 
@@ -58,9 +58,9 @@ func (node *RaftNode) ReadCommand(key int) bool {
 		resp, err := http.Get(url)
 
 		if err != nil {
-			log.Printf("\nREAD successful. \nData: %v\n", response)
+			log.Printf("\nREAD successful. \nData: %v\n", resp)
 		} else {
-			log.Printf("\nREAD failed. \nData: %v\n", response)
+			log.Printf("\nREAD failed. \nError: %v\n", err)
 		}
 
 		return true

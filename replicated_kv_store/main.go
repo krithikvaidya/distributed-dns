@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/kv_store"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft_server"
 	"google.golang.org/grpc"
 )
 
@@ -31,6 +32,24 @@ func start_key_value_replica(addr string) {
 	r.HandleFunc("/{key}", kv.GetHandler).Methods("GET")
 	r.HandleFunc("/{key}", kv.PutHandler).Methods("PUT")
 	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
+
+	//Start the server and listen for requests. This is blocking.
+	err := http.ListenAndServe(addr, r)
+
+	CheckError(err)
+
+}
+
+func start_raft_replica_server(addr string) {
+
+	// Start a server to listen for client requests
+	r := mux.NewRouter()
+
+	r.HandleFunc("/test", raft_server.TestHandler).Methods("GET")
+	// r.HandleFunc("/{key}", raft_server.PostHandler).Methods("POST")
+	// r.HandleFunc("/{key}", raft_server.GetHandler).Methods("GET")
+	// r.HandleFunc("/{key}", raft_server.PutHandler).Methods("PUT")
+	// r.HandleFunc("/{key}", raft_server.DeleteHandler).Methods("DELETE")
 
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)
@@ -78,6 +97,7 @@ func main() {
 
 	fmt.Printf("\nSuccessfully bound to address %v\n", address)
 
+	// Start the local key value store and wait for it to initialize
 	var addresskeyvalue string
 	fmt.Printf("\nEnter the port the key-value replica should listen on: ")
 	fmt.Scanf("%s", &addresskeyvalue)
@@ -94,6 +114,28 @@ func main() {
 
 		if err == nil {
 			fmt.Printf("\nKey-value store up and listening at port %s\n", addresskeyvalue)
+			break
+		}
+
+	}
+
+	// Start the raft replica server and wait for it to initialize
+	fmt.Printf("\nEnter the port the replica should listen for client requests on: ")
+	var server_address string
+	fmt.Scanf("%s", &server_address)
+
+	go start_raft_replica_server(server_address)
+
+	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
+
+	fmt.Printf("\nStarting raft replica server...\n")
+
+	for {
+
+		_, err := http.Get(test_addr)
+
+		if err == nil {
+			fmt.Printf("\nRaft replica server up and listening at port %s\n", server_address)
 			break
 		}
 
