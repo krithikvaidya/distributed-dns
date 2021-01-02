@@ -74,7 +74,6 @@ func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kv.mu.RLock()
-	fmt.Fprintf(w, "GET request successful\n")
 	params := mux.Vars(r)
 	key := params["key"]
 	value := kv.Get(key)

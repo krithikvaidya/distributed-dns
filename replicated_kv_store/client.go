@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -48,7 +50,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 }
 
 // ReadCommand is different since read operations do not need to be added to log
-func (node *RaftNode) ReadCommand(key int) bool {
+func (node *RaftNode) ReadCommand(key int) (string, error) {
 
 	write_success := make(chan bool)
 	node.StaleReadCheck(write_success)
@@ -62,16 +64,21 @@ func (node *RaftNode) ReadCommand(key int) bool {
 
 		resp, err := http.Get(url)
 
-		if err != nil {
-			log.Printf("\nREAD successful. \nData: %v\n", resp)
-		} else {
-			log.Printf("\nREAD failed. \nError: %v\n", err)
-		}
+		if err == nil {
 
-		return true
+			defer resp.Body.Close()
+			contents, err := ioutil.ReadAll(resp.Body)
+
+			log.Printf("\nREAD successful.\n")
+
+			return string(contents), err
+
+		} else {
+			return "error occured", err
+		}
 	}
 
-	return false
+	return "unable to perform read", errors.New("read_failed")
 }
 
 // StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come
@@ -82,12 +89,19 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 
 	node.raft_node_mutex.RLock()
 
+	prevLogIndex := node.nextIndex[replica_id] - 1
+	prevLogTerm := int32(-1)
+
+	if prevLogIndex >= 0 {
+		prevLogTerm = node.log[prevLogIndex].Term
+	}
+
 	hbeat_msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
 		LeaderId:     node.replica_id,
-		PrevLogIndex: node.nextIndex[replica_id] - 1,
-		PrevLogTerm:  node.log[node.nextIndex[replica_id]-1].Term,
+		PrevLogIndex: prevLogIndex,
+		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
 	}

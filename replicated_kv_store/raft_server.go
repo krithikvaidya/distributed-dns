@@ -75,10 +75,13 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	k, _ := strconv.Atoi(key)
 
-	if node.ReadCommand(k) {
-		fmt.Fprintf(w, "\nRead success.\n")
+	if response, err := node.ReadCommand(k); err == nil {
+
+		prnt_str := "\nRead operation completed. Result: " + response + "\n"
+		fmt.Fprintf(w, prnt_str)
+
 	} else {
-		fmt.Fprintf(w, "\nRead failed.\n")
+		fmt.Fprintf(w, "\nRead failed with error %v\n", err)
 	}
 }
 

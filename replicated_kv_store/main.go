@@ -45,10 +45,10 @@ func (node *RaftNode) start_raft_replica_server(addr string) {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/test", node.TestHandler).Methods("GET")
-	// r.HandleFunc("/{key}", raft_server.PostHandler).Methods("POST")
+	r.HandleFunc("/{key}", node.PostHandler).Methods("POST")
 	r.HandleFunc("/{key}", node.GetHandler).Methods("GET")
-	// r.HandleFunc("/{key}", raft_server.PutHandler).Methods("PUT")
-	// r.HandleFunc("/{key}", raft_server.DeleteHandler).Methods("DELETE")
+	r.HandleFunc("/{key}", node.PutHandler).Methods("PUT")
+	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)
