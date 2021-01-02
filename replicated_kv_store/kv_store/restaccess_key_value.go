@@ -1,9 +1,10 @@
-package main
+package kv_store
 
 import (
 	"fmt"
 	"net/http"
 	"sync"
+
 	"github.com/gorilla/mux"
 )
 
@@ -133,4 +134,3 @@ func (kv *store) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	kv.mu.Unlock()
 }
-

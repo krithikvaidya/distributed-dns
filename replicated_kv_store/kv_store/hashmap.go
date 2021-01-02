@@ -1,5 +1,4 @@
-package main
-
+package kv_store
 
 const (
 	prime = 17003

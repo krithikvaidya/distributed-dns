@@ -18,6 +18,26 @@ import (
 
 var n_replica int
 
+func start_key_value_replica(addr string) {
+
+	// Set up the key-value store on the local machine
+
+	kv := kv_store.newStore() // newStore() defined in restaccess_key_value.go
+	r := mux.NewRouter()
+
+	r.HandleFunc("/kvstore", kv.kvstoreHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.postHandler).Methods("POST")
+	r.HandleFunc("/{key}", kv.getHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.putHandler).Methods("PUT")
+	r.HandleFunc("/{key}", kv.deleteHandler).Methods("DELETE")
+
+	//Start the server and listen for requests. This is blocking.
+	err := http.ListenAndServe(addr, r)
+
+	CheckError(err)
+
+}
+
 func init() {
 
 	/*
@@ -35,23 +55,6 @@ func init() {
 	log.SetFlags(0) // Turn off timestamps in log output.
 	rand.Seed(time.Now().UnixNano())
 
-}
-
-func start_key_value_replica(addr string, done chan bool) {
-	kv := newStore()
-	r := mux.NewRouter()
-	r.HandleFunc("/kvstore", kv.kvstoreHandler).Methods("GET")
-	r.HandleFunc("/{key}", kv.postHandler).Methods("POST")
-	r.HandleFunc("/{key}", kv.getHandler).Methods("GET")
-	r.HandleFunc("/{key}", kv.putHandler).Methods("PUT")
-	r.HandleFunc("/{key}", kv.deleteHandler).Methods("DELETE")
-
-	//Start the server and listen for requests
-	fmt.Printf("Starting server at port %s\n", addr)
-	done <- true
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func main() {
@@ -73,13 +76,27 @@ func main() {
 	CheckError(err)
 
 	fmt.Printf("\nSuccessfully bound to address %v\n", address)
+
 	var addresskeyvalue string
-	fmt.Printf("\nEnter port to run key-value replica: ")
+	fmt.Printf("\nEnter the port the key-value replica should listen on: ")
 	fmt.Scanf("%s", &addresskeyvalue)
 
-	done := make(chan bool, 1)
-	go start_key_value_replica(addresskeyvalue, done)
-	<-done
+	go start_key_value_replica(addresskeyvalue)
+
+	test_addr := fmt.Sprintf("http://localhost%s/kvstore", addresskeyvalue)
+
+	fmt.Printf("\nStarting local key-value store...\n")
+
+	for {
+
+		_, err := http.Get(test_addr)
+
+		if err == nil {
+			fmt.Printf("\nKey-value store up and listening at port %s\n", addresskeyvalue)
+			break
+		}
+
+	}
 
 	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
 
