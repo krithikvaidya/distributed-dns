@@ -13,6 +13,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 	// log.Printf("\nIn RequestVote. rw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nLocked in RequestVote\n")
 
 	node_current_term := node.currentTerm
 	latestLogIndex := int32(-1)
@@ -30,7 +31,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 	// follower (if not already a follower) and update term.
 	if in.Term > node_current_term {
 		node.ToFollower(in.Term)
-		log.Printf("\nAfter tofollower, my term %v\n", node.currentTerm)
+		// log.Printf("\nAfter tofollower, my term %v\n", node.currentTerm)
 	}
 
 	// Grant vote if the received message's term is not lesser than the replica's term, and if the
@@ -46,12 +47,14 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 		log.Printf("\nGranting vote\n")
 
+		// log.Printf("\nUnLocked in RequestVote\n")
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
 
 	} else {
 
 		log.Printf("\nRejecting vote\n")
+		// log.Printf("\nUnLocked in RequestVote\n")
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
 
