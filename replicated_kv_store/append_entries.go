@@ -9,11 +9,13 @@ import (
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nLocked in AppendEntries\n")
 
 	// term received is lesser than current term
 	if node.currentTerm > in.Term {
 
 		node.raft_node_mutex.Unlock()
+		// log.Printf("\nUnLocked in AppendEntries\n")
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
@@ -29,6 +31,9 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	}
 
 	// here we can be sure that the node's current term and the term in the message match.
+	if node.electionTimerRunning {
+		node.electionResetEvent <- true
+	}
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -81,11 +86,15 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			}
 		}
 
+		// log.Printf("\nUnLocked in AppendEntries\n")
+
 		node.raft_node_mutex.Unlock()
+
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
+		// log.Printf("\nUnLocked in AppendEntries\n")
 		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 

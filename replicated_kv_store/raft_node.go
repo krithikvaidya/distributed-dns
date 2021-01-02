@@ -31,6 +31,7 @@ type RaftNode struct {
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
 	electionTimerRunning bool
+	commit_chan          chan bool // once an entry is successfully/unsucessfully replicated, this channel is written to
 
 	// States mentioned in figure 2 of the paper:
 
@@ -111,10 +112,12 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	go node.RunElectionTimer()
 
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nLocked in ConnectToPeerReplicas\n")
 
 	node.electionTimerRunning = true
 	node.peer_replica_clients = client_objs
 
+	// log.Printf("\nUnLocked in ConnectedTOPeerReplicas\n")
 	node.raft_node_mutex.Unlock()
 }
 
@@ -154,6 +157,7 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 
 	// log.Printf("\nrw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
+	// log.Printf("\nLocked in ReplicaReady\n")
 
 	// log.Printf("\nObtained ReplicaReady Lock\n")
 
@@ -174,6 +178,7 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 	}
 
 	// log.Printf("\nPerform ReplicaReady Unlock\n")
+	// log.Printf("\nUnLocked in ReplicaReady\n")
 	node.raft_node_mutex.Unlock()
 	// log.Printf("\nrw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 
