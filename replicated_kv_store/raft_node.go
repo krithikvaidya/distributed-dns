@@ -44,6 +44,7 @@ type RaftNode struct {
 	// State to be maintained on all replicas
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
+	successfulwrite    chan bool     // Channel to signal that write has been replicated on majority of the nodes
 	commitIndex        int32         // Index of the highest long entry known to be committed
 	lastApplied        int32         // Index of the highest log entry applied to the state machine
 	state              RaftNodeState // The current state of the node(eg. Candidate, Leader, etc)
@@ -72,6 +73,7 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 
 		stopElectiontimer:  make(chan bool),
 		electionResetEvent: make(chan bool),
+		successfulwrite:    make(chan bool),
 		commitIndex:        0, // index of highest log entry known to be committed.
 		lastApplied:        0, // index of highest log entry applied to state machine.
 	}
