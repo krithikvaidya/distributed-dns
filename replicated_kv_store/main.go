@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/kv_store"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft_server"
 	"google.golang.org/grpc"
 )
 
@@ -40,12 +39,12 @@ func start_key_value_replica(addr string) {
 
 }
 
-func start_raft_replica_server(addr string) {
+func (node *RaftNode) start_raft_replica_server(addr string) {
 
 	// Start a server to listen for client requests
 	r := mux.NewRouter()
 
-	r.HandleFunc("/test", raft_server.TestHandler).Methods("GET")
+	r.HandleFunc("/test", node.TestHandler).Methods("GET")
 	// r.HandleFunc("/{key}", raft_server.PostHandler).Methods("POST")
 	// r.HandleFunc("/{key}", raft_server.GetHandler).Methods("GET")
 	// r.HandleFunc("/{key}", raft_server.PutHandler).Methods("PUT")
@@ -119,27 +118,11 @@ func main() {
 
 	}
 
-	// Start the raft replica server and wait for it to initialize
+	// Get the address to bind the server that listens to client requests.
 	fmt.Printf("\nEnter the port the replica should listen for client requests on: ")
 	var server_address string
 	fmt.Scanf("%s", &server_address)
-
-	go start_raft_replica_server(server_address)
-
-	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
-
-	fmt.Printf("\nStarting raft replica server...\n")
-
-	for {
-
-		_, err := http.Get(test_addr)
-
-		if err == nil {
-			fmt.Printf("\nRaft replica server up and listening at port %s\n", server_address)
-			break
-		}
-
-	}
+	// Starting the server is done after InitializeNode
 
 	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
 
@@ -159,6 +142,25 @@ func main() {
 
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
+
+	// Now we can start listening to client requests
+	// Start the raft replica server and wait for it to initialize
+	go node.start_raft_replica_server(server_address)
+
+	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
+
+	fmt.Printf("\nStarting raft replica server...\n")
+
+	for {
+
+		_, err := http.Get(test_addr)
+
+		if err == nil {
+			fmt.Printf("\nRaft replica server up and listening at port %s\n", server_address)
+			break
+		}
+
+	}
 
 	// ConsensusService is defined in protos/replica.proto./
 	// RegisterConsensusServiceServer is present in the generated .pb.go file
