@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
@@ -39,15 +43,26 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 
 // ReadCommand is different since read operations do not need to be added to log
 func (node *RaftNode) ReadCommand(key int) bool {
+
 	node.StaleReadCheck()
 
-	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
+	node.raft_node_mutex.RLock()
+	defer node.raft_node_mutex.RUnlock()
 
 	if node.state == Leader {
-		/*
-			Call function to return value of the key
-		*/
+
+		// assuming that if an operation on the state machine succeeds on one of the replicas,
+		// it will succeed on all. and vice versa.
+		url := fmt.Sprintf("http://localhost%s/%d", node.kvstore_addr, key)
+
+		resp, err := http.Get(url)
+
+		if err != nil {
+			log.Printf("\nREAD successful. \nData: %v\n", response)
+		} else {
+			log.Printf("\nREAD failed. \nData: %v\n", response)
+		}
+
 		return true
 	}
 
