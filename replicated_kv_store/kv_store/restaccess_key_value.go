@@ -18,12 +18,12 @@ type store struct {
 }
 
 //creates a new instance of key value store
-func newStore() *store {
+func NewStore() *store {
 	return &store{}
 }
 
 //test handler
-func (kv *store) kvstoreHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/kvstore" {
 		http.Error(w, "404 not found.", http.StatusNotFound)
 		return
@@ -38,7 +38,7 @@ func (kv *store) kvstoreHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all post requests
-func (kv *store) postHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return
@@ -67,7 +67,7 @@ func (kv *store) postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all get requests
-func (kv *store) getHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return
@@ -87,7 +87,7 @@ func (kv *store) getHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all put requests
-func (kv *store) putHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "PUT" {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return
@@ -115,7 +115,7 @@ func (kv *store) putHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all delete requests
-func (kv *store) deleteHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "DELETE" {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/kv_store"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -22,14 +23,14 @@ func start_key_value_replica(addr string) {
 
 	// Set up the key-value store on the local machine
 
-	kv := kv_store.newStore() // newStore() defined in restaccess_key_value.go
+	kv := kv_store.NewStore() // NewStore() defined in restaccess_key_value.go
 	r := mux.NewRouter()
 
-	r.HandleFunc("/kvstore", kv.kvstoreHandler).Methods("GET")
-	r.HandleFunc("/{key}", kv.postHandler).Methods("POST")
-	r.HandleFunc("/{key}", kv.getHandler).Methods("GET")
-	r.HandleFunc("/{key}", kv.putHandler).Methods("PUT")
-	r.HandleFunc("/{key}", kv.deleteHandler).Methods("DELETE")
+	r.HandleFunc("/kvstore", kv.KvstoreHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.PostHandler).Methods("POST")
+	r.HandleFunc("/{key}", kv.GetHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.PutHandler).Methods("PUT")
+	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
 
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)

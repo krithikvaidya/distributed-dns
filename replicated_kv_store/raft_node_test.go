@@ -102,4 +102,9 @@ func TestInitializeNode(t *testing.T) {
 	if node.lastApplied != 0 {
 		t.Errorf("Invalid value %v for lastApplied, expected 0", node.lastApplied)
 	}
+
+	// Check the value of `kvstore_addr`
+	if node.kvstore_addr != ":8081" {
+		t.Errorf("Invalid value %v for kvstore_addr, expected :8081", node.kvstore_addr)
+	}
 }
