@@ -6,10 +6,12 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -35,6 +37,23 @@ func init() {
 
 }
 
+func start_key_value_replica(addr string, done chan bool) {
+	kv := newStore()
+	r := mux.NewRouter()
+	r.HandleFunc("/kvstore", kv.kvstoreHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.postHandler).Methods("POST")
+	r.HandleFunc("/{key}", kv.getHandler).Methods("GET")
+	r.HandleFunc("/{key}", kv.putHandler).Methods("PUT")
+	r.HandleFunc("/{key}", kv.deleteHandler).Methods("DELETE")
+
+	//Start the server and listen for requests
+	fmt.Printf("Starting server at port %s\n", addr)
+	done <- true
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 
 	fmt.Println("\nRaft-based Replicated Key Value Store")
@@ -54,6 +73,13 @@ func main() {
 	CheckError(err)
 
 	fmt.Printf("\nSuccessfully bound to address %v\n", address)
+	var addresskeyvalue string
+	fmt.Printf("\nEnter port to run key-value replica: ")
+	fmt.Scanf("%s", &addresskeyvalue)
+
+	done := make(chan bool, 1)
+	go start_key_value_replica(addresskeyvalue, done)
+	<-done
 
 	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
 
@@ -72,7 +98,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	// InitializeNode() is defined in raft_node.go
-	node := InitializeNode(int32(n_replica), rid)
+	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
 
 	// ConsensusService is defined in protos/replica.proto./
 	// RegisterConsensusServiceServer is present in the generated .pb.go file
@@ -100,10 +126,8 @@ func main() {
 	fmt.Printf("\nAttempting to connect to peer replicas...\n")
 	node.ConnectToPeerReplicas(rep_addrs)
 	log.Printf("\nSuccessfully connected to peer replicas.\n")
-
 	<-node.ready_chan // wait until all connections to our have been established.
 	log.Printf("\nAll peer replicas have successfully connected.\n")
-
 	// this goroutine will keep monitoring all connections and try to re-establish connections that die
 	// go node.MonitorConnections()
 
