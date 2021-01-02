@@ -31,8 +31,7 @@ type RaftNode struct {
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
 	electionTimerRunning bool
-	kvstore_addr         string    //to store respective port on which replicated key value store is running
-	commit_chan          chan bool // once an entry is successfully/unsucessfully replicated, this channel is written to
+	kvstore_addr         string //to store respective port on which replicated key value store is running
 
 	// States mentioned in figure 2 of the paper:
 
@@ -44,7 +43,6 @@ type RaftNode struct {
 	// State to be maintained on all replicas
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
-	successfulwrite    chan bool     // Channel to signal that write has been replicated on majority of the nodes
 	commitIndex        int32         // Index of the highest long entry known to be committed
 	lastApplied        int32         // Index of the highest log entry applied to the state machine
 	state              RaftNodeState // The current state of the node(eg. Candidate, Leader, etc)
@@ -73,7 +71,6 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 
 		stopElectiontimer:  make(chan bool),
 		electionResetEvent: make(chan bool),
-		successfulwrite:    make(chan bool),
 		commitIndex:        0, // index of highest log entry known to be committed.
 		lastApplied:        0, // index of highest log entry applied to state machine.
 	}
@@ -116,12 +113,12 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	go node.RunElectionTimer()
 
 	node.raft_node_mutex.Lock()
-	// log.Printf("\nLocked in ConnectToPeerReplicas\n")
+	log.Printf("\nLocked in ConnectToPeerReplicas\n")
 
 	node.electionTimerRunning = true
 	node.peer_replica_clients = client_objs
 
-	// log.Printf("\nUnLocked in ConnectedTOPeerReplicas\n")
+	log.Printf("\nUnLocked in ConnectedTOPeerReplicas\n")
 	node.raft_node_mutex.Unlock()
 }
 

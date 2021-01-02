@@ -92,7 +92,12 @@ func (node *RaftNode) ToLeader() {
 		Entries:      entries,
 	}
 
-	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1))
+	log.Printf("\nUnlock in ToLeader()\n")
+	node.raft_node_mutex.Unlock()
+
+	success := make(chan bool)
+	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1), success)
+	<-success
 
 	go node.HeartBeats()
 }

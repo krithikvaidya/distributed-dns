@@ -10,8 +10,6 @@ import (
 
 //WriteCommand allows clients to submit a new command to the leader
 func (node *RaftNode) WriteCommand(operation []string) bool {
-	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
 
 	// True only if leader
 	if node.state == Leader {
@@ -31,11 +29,19 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 			Entries:      entries,
 		}
 
-		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1))
+		successful_write := make(chan bool)
+		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
 
-		val := <-node.successfulwrite //Written to from AE when majority of nodes have replicated the write
+		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
 
-		return val
+		if success {
+			node.commitIndex++
+			log.Printf("\nWrite operation successfully completed and committed.\n")
+		} else {
+			log.Printf("\nWrite operation failed.\n")
+		}
+
+		return success
 	}
 
 	return false
@@ -44,12 +50,11 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 // ReadCommand is different since read operations do not need to be added to log
 func (node *RaftNode) ReadCommand(key int) bool {
 
-	node.raft_node_mutex.RLock()
-	defer node.raft_node_mutex.RUnlock()
+	write_success := make(chan bool)
+	node.StaleReadCheck(write_success)
+	status := <-write_success
 
-	node.StaleReadCheck()
-
-	if node.state == Leader {
+	if (status == true) && (node.state == Leader) {
 
 		// assuming that if an operation on the state machine succeeds on one of the replicas,
 		// it will succeed on all. and vice versa.
@@ -70,10 +75,12 @@ func (node *RaftNode) ReadCommand(key int) bool {
 }
 
 // StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come
-func (node *RaftNode) StaleReadCheck() {
+func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 	replica_id := 0
 
 	var entries []*protos.LogEntry
+
+	node.raft_node_mutex.RLock()
 
 	hbeat_msg := &protos.AppendEntriesMessage{
 
@@ -85,5 +92,7 @@ func (node *RaftNode) StaleReadCheck() {
 		Entries:      entries,
 	}
 
-	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)))
+	node.raft_node_mutex.RUnlock()
+
+	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)), write_success)
 }

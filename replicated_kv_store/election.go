@@ -24,12 +24,12 @@ func (node *RaftNode) RunElectionTimer() {
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 		node.raft_node_mutex.Lock()
-		// log.Printf("\nLocked in RunElectionTimer\n")
+		log.Printf("\nLocked in RunElectionTimer\n")
 
 		node.electionTimerRunning = false
 		node.ToCandidate()
 
-		// log.Printf("\nUnlocked in AppendEntries\n")
+		log.Printf("\nUnlocked in AppendEntries\n")
 
 		node.raft_node_mutex.Unlock()
 		return
@@ -110,8 +110,7 @@ func (node *RaftNode) StartElection() {
 
 						if votes*2 > int(node.n_replicas) { // won the Election
 							node.ToLeader()
-							log.Printf("\nUnlock in StartElection after response\n")
-							node.raft_node_mutex.Unlock()
+
 							return
 						}
 

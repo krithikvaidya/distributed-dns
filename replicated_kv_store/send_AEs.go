@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
 	"sync/atomic"
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/tevino/abool"
 )
 
 // To send AppendEntry to single replica, and retry if needed.
@@ -21,7 +21,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	if response.Success == false {
 
 		if node.state != Leader {
-			return
+			return false
 		}
 
 		if response.Term > node.currentTerm {
@@ -71,7 +71,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 }
 
 // Leader sending AppendEntries to all other replicas.
-func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int32) {
+func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int32, successful_write chan bool) {
 
 	replica_id := int32(0)
 
@@ -81,6 +81,8 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	successes := int32(1)
 
+	channel_closed := abool.New() // atomic boolean variable
+
 	for _, client_obj := range node.peer_replica_clients {
 
 		if replica_id == node.replica_id {
@@ -88,27 +90,35 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.Lock()
-			// log.Printf("\nLocked in LeaderSendAEs spawned goroutine\n")
-			// log.Printf("\nDATA: \n")
-			// log.Printf("\nreplica_id: %v, upper_index: %v, msg: %v\n", replica_id, upper_index, msg)
+
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
 				tot_success := atomic.AddInt32(&successes, 1)
-				if (msg_type != "HBEAT") && (tot_success > (node.n_replicas)/2) {
-					log.Printf("node.commit_chan true")
-					// node.commit_chan <- true
+				if tot_success > (node.n_replicas)/2 {
+
+					if channel_closed.IsNotSet() {
+						successful_write <- true
+						channel_closed.Set()
+						close(successful_write)
+					}
+
 				}
 			} else {
-				log.Printf("node.commit_chan false")
-				// node.commit_chan <- false
+
+				if channel_closed.IsNotSet() {
+					successful_write <- false
+					channel_closed.Set()
+					close(successful_write)
+				}
+
 			}
 
 			// log.Printf("\nUnLocked in LeaderSendAEs spawned goroutine\n")
 			node.raft_node_mutex.Unlock()
 
-		}(node, client_obj, replica_id, upper_index)
+		}(node, client_obj, replica_id, upper_index, successful_write)
 
 		replica_id++
 
@@ -159,9 +169,12 @@ func (node *RaftNode) HeartBeats() {
 			Entries:      entries,
 		}
 
-		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)))
-		// log.Printf("\nRunLock in HeartBeats\n")
+		// log.Printf("\nRUnlock in HeartBeats\n")
 		node.raft_node_mutex.RUnlock()
+
+		success := make(chan bool)
+		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)), success)
+		<-success
 
 	}
 }
