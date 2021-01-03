@@ -35,6 +35,9 @@ type RaftNode struct {
 
 	// States mentioned in figure 2 of the paper:
 
+	newCommitReadyChan chan struct{} // Channel to signal once commit has been made
+	storePort          int32         //Port on which the state machine is being run
+
 	// State to be maintained on all replicas (TODO: persist)
 	currentTerm int32             // Latest term server has seen
 	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
@@ -64,6 +67,8 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 		state:                Follower, // all nodes are initialized as followers
 		electionTimerRunning: false,
 		kvstore_addr:         keyvalue_port,
+
+		storePort: 8081,
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
