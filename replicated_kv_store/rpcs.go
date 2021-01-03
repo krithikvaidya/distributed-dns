@@ -176,17 +176,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			if in.LeaderCommit < int32(len(node.log)-1) {
 
-				log.Printf("\nin.LeaderCommit < int32(len(node.log)-1)\n")
 				node.commitIndex = in.LeaderCommit
 
 			} else {
 
-				log.Printf("\nin.LeaderCommit >= int32(len(node.log)-1)\n")
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
-
-			log.Printf("\nwriting to commits ready channel\n")
 
 			// log.Printf("\nUnLocked in AppendEntries\n")
 			node.raft_node_mutex.Unlock()

@@ -51,8 +51,6 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	operation[1] = key
 	operation[2] = value
 
-	log.Printf("here")
-
 	if node.WriteCommand(operation) {
 		fmt.Fprintf(w, "\nSuccessful POST\n")
 	} else {

@@ -21,7 +21,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 
 		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
 
-		log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
+		// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
 		var entries []*protos.LogEntry
 		entries = append(entries, &node.log[len(node.log)-1])
