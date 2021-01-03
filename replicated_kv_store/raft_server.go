@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -22,7 +23,7 @@ func (node *RaftNode) TestHandler(w http.ResponseWriter, r *http.Request) {
 //handles all post requests
 func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "\nPOST request received\n")
+	log.Printf("\nPOST request received\n")
 
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
@@ -30,13 +31,16 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	node.raft_node_mutex.RLock()
+	log.Printf("\nRlock acquired in PostHandler\n")
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+		log.Printf("\nRlock released in PostHandler\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
 
+	log.Printf("\nRlock released in PostHandler\n")
 	node.raft_node_mutex.RUnlock()
 
 	value := r.FormValue("value")
@@ -47,6 +51,8 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	operation[0] = "POST"
 	operation[1] = key
 	operation[2] = value
+
+	log.Printf("here")
 
 	if node.WriteCommand(operation) {
 		fmt.Fprintf(w, "\nSuccessful POST\n")

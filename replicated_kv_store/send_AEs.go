@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -12,8 +13,9 @@ import (
 // To send AppendEntry to single replica, and retry if needed.
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) (status bool) {
 
+	log.Printf("\ntest\n")
 	response, err := client_obj.AppendEntries(context.Background(), msg)
-
+	log.Printf("\ntest2\n")
 	if err != nil {
 		// ...
 	}
@@ -57,6 +59,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			Entries:      entries,
 		}
 
+		log.Printf("\ntest3\n")
 		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
 
 	} else {
@@ -64,6 +67,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		node.nextIndex[replica_id] = upper_index + 1
 		node.matchIndex[replica_id] = upper_index
 
+		log.Printf("\ntest4\n")
 		return true
 
 	}
@@ -90,9 +94,10 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool, channel_closed *abool.AtomicBool) {
 
 			node.raft_node_mutex.Lock()
+			log.Printf("\nLocked in LeaderSendAEs spawned goroutine\n")
 
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
 				tot_success := atomic.AddInt32(&successes, 1)
@@ -115,10 +120,10 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 			}
 
-			// log.Printf("\nUnLocked in LeaderSendAEs spawned goroutine\n")
+			log.Printf("\nUnLocked in LeaderSendAEs spawned goroutine\n")
 			node.raft_node_mutex.Unlock()
 
-		}(node, client_obj, replica_id, upper_index, successful_write)
+		}(node, client_obj, replica_id, upper_index, successful_write, channel_closed)
 
 		replica_id++
 

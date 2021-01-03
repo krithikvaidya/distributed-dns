@@ -193,6 +193,8 @@ func main() {
 	// this goroutine will keep monitoring all connections and try to re-establish connections that die
 	// go node.MonitorConnections()
 
+	go node.ApplyToStateMachine()
+
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)
 	<-all_connected

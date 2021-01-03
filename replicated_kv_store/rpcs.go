@@ -154,11 +154,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			if logIndex == len(node.log) {
 
 				// add new entry to log
+				log.Printf("\nadd new entry to logs\n")
 				node.log = append(node.log, *in.Entries[entryIndex])
 
 			} else {
 
 				// overwrite invalidated log entry
+				log.Printf("\noverwrite invalidated log entry\n")
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
@@ -170,20 +172,31 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 		//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 		if in.LeaderCommit > node.commitIndex {
 
+			old_commit_index := node.commitIndex
+
 			if in.LeaderCommit < int32(len(node.log)-1) {
 
+				log.Printf("\nin.LeaderCommit < int32(len(node.log)-1)\n")
 				node.commitIndex = in.LeaderCommit
 
 			} else {
 
+				log.Printf("\nin.LeaderCommit >= int32(len(node.log)-1)\n")
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
+
+			log.Printf("\nwriting to commits ready channel\n")
+
+			// log.Printf("\nUnLocked in AppendEntries\n")
+			node.raft_node_mutex.Unlock()
+
+			node.commits_ready <- (node.commitIndex - old_commit_index)
+
+		} else {
+			// log.Printf("\nUnLocked in AppendEntries\n")
+			node.raft_node_mutex.Unlock()
 		}
-
-		// log.Printf("\nUnLocked in AppendEntries\n")
-
-		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 
@@ -191,6 +204,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		// log.Printf("\nUnLocked in AppendEntries\n")
 		node.raft_node_mutex.Unlock()
+
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	}

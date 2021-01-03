@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -31,12 +35,10 @@ type RaftNode struct {
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
 	electionTimerRunning bool
-	kvstore_addr         string //to store respective port on which replicated key value store is running
+	kvstore_addr         string     //to store respective port on which replicated key value store is running
+	commits_ready        chan int32 // Channel to signal once commit has been made
 
 	// States mentioned in figure 2 of the paper:
-
-	newCommitReadyChan chan struct{} // Channel to signal once commit has been made
-	storePort          int32         //Port on which the state machine is being run
 
 	// State to be maintained on all replicas (TODO: persist)
 	currentTerm int32             // Latest term server has seen
@@ -67,8 +69,7 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 		state:                Follower, // all nodes are initialized as followers
 		electionTimerRunning: false,
 		kvstore_addr:         keyvalue_port,
-
-		storePort: 8081,
+		commits_ready:        make(chan int32),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -76,8 +77,8 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 
 		stopElectiontimer:  make(chan bool),
 		electionResetEvent: make(chan bool),
-		commitIndex:        0, // index of highest log entry known to be committed.
-		lastApplied:        0, // index of highest log entry applied to state machine.
+		commitIndex:        -1, // index of highest log entry known to be committed.
+		lastApplied:        -1, // index of highest log entry applied to state machine.
 	}
 
 	return rn
@@ -152,3 +153,94 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 // 	}
 
 // }
+
+// Apply committed entries to our state machine.
+func (node *RaftNode) ApplyToStateMachine() {
+
+	for {
+
+		log.Printf("\nIn ApplyToStateMachine\n")
+		to_commit := <-node.commits_ready
+		log.Printf("\nReceived commit(s)\n")
+
+		// Find which entries we have to apply.
+		node.raft_node_mutex.Lock()
+		log.Printf("\nLocked in ApplyToStateMachine\n")
+		defer node.raft_node_mutex.Unlock()
+
+		var entries []protos.LogEntry
+
+		if node.commitIndex > node.lastApplied {
+			entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit]
+			log.Printf("Operations to be applied to kv_store\n")
+		} else {
+			log.Printf("Fatal: node.commitIndex <= node.lastApplied in ApplyToStateMachine\n")
+			return
+		}
+
+		for _, entry := range entries {
+			formData := url.Values{
+				"value": {entry.Operation[2]},
+			}
+
+			timeout := time.Duration(100 * time.Microsecond)
+			client := http.Client{
+				Timeout: timeout,
+			}
+
+			switch entry.Operation[0] {
+
+			case "POST":
+				formData := url.Values{
+					"value": {entry.Operation[2]},
+				}
+
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				if err != nil {
+					log.Printf("\nError in http.NewRequest: %v\n", err)
+					return
+				}
+
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Printf("\nError in client.Do(req): %v\n", err)
+					return
+				}
+
+				defer resp.Body.Close()
+				break
+
+			case "PUT":
+
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				CheckError(err)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "DELETE":
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(""))
+				CheckError(err)
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+
+			case "NO-OP":
+				log.Printf("\nNO-OP encountered\n")
+
+			default:
+				log.Printf("\nFatal: Invalid operation: %v\n", entry.Operation[0])
+
+			}
+
+		}
+		node.lastApplied = node.lastApplied + to_commit
+		log.Println("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+	}
+}

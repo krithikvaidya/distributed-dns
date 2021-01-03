@@ -13,9 +13,13 @@ import (
 //WriteCommand allows clients to submit a new command to the leader
 func (node *RaftNode) WriteCommand(operation []string) bool {
 
+	node.raft_node_mutex.Lock()
+
 	// True only if leader
 	if node.state == Leader {
 		//append to local log
+
+		log.Printf("\nhere2\n")
 		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
 
 		var entries []*protos.LogEntry
@@ -32,12 +36,19 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 		}
 
 		successful_write := make(chan bool)
+		log.Printf("\nbefore leader send aes\n")
 		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
+		log.Printf("\nafter leader send aes\n")
+		node.raft_node_mutex.Unlock()
 
 		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
+		log.Printf("\nafter leader send aes success\n")
 
 		if success {
+			node.raft_node_mutex.Lock()
 			node.commitIndex++
+			node.raft_node_mutex.Unlock()
+			node.commits_ready <- 1
 			log.Printf("\nWrite operation successfully completed and committed.\n")
 		} else {
 			log.Printf("\nWrite operation failed.\n")
@@ -46,6 +57,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 		return success
 	}
 
+	node.raft_node_mutex.Unlock()
 	return false
 }
 

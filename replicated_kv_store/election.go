@@ -21,20 +21,22 @@ func (node *RaftNode) RunElectionTimer() {
 
 	case <-time.After(duration): //for timeout to call election
 
+		log.Printf("\nElection timer runs out.\n")
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 		node.raft_node_mutex.Lock()
-		log.Printf("\nLocked in RunElectionTimer\n")
+		// log.Printf("\nLocked in RunElectionTimer\n")
 
 		node.electionTimerRunning = false
 		node.ToCandidate()
 
-		log.Printf("\nUnlocked in AppendEntries\n")
+		// log.Printf("\nUnlocked in AppendEntries\n")
 
 		node.raft_node_mutex.Unlock()
 		return
 
 	case <-node.stopElectiontimer: //to stop timer
+		node.electionTimerRunning = false
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
@@ -60,7 +62,7 @@ func (node *RaftNode) StartElection() {
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32) {
 
 			node.raft_node_mutex.RLock()
-			log.Printf("\nRLock in StartElection\n")
+			// log.Printf("\nRLock in StartElection\n")
 
 			latestLogIndex := int32(-1)
 			latestLogTerm := int32(-1)
@@ -78,19 +80,19 @@ func (node *RaftNode) StartElection() {
 			}
 
 			node.raft_node_mutex.RUnlock()
-			log.Printf("\nRUnLock in StartElection\n")
+			// log.Printf("\nRUnLock in StartElection\n")
 
 			//request vote and get reply
 			response, err := client_obj.RequestVote(context.Background(), &args)
 
 			node.raft_node_mutex.Lock()
-			log.Printf("\nLock in StartElection after response\n")
+			// log.Printf("\nLock in StartElection after response\n")
 			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 
 				if node.state != Candidate {
-					log.Printf("\nUnlock in StartElection after response\n")
+					// log.Printf("\nUnlock in StartElection after response\n")
 					node.raft_node_mutex.Unlock()
 					return
 				}
@@ -98,7 +100,7 @@ func (node *RaftNode) StartElection() {
 				if response.Term > node.currentTerm { // the response node has higher term than current one
 
 					node.ToFollower(response.Term)
-					log.Printf("\nUnlock in StartElection after response\n")
+					// log.Printf("\nUnlock in StartElection after response\n")
 					node.raft_node_mutex.Unlock()
 					return
 
@@ -121,7 +123,7 @@ func (node *RaftNode) StartElection() {
 			} else {
 
 				log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
-				log.Printf("\nUnlock in StartElection after response\n")
+				// log.Printf("\nUnlock in StartElection after response\n")
 				node.raft_node_mutex.Unlock()
 
 			}
@@ -132,6 +134,6 @@ func (node *RaftNode) StartElection() {
 
 	}
 
-	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 	node.electionTimerRunning = false
+	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 }
