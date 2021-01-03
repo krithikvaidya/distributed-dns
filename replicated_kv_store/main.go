@@ -143,6 +143,8 @@ func main() {
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
 
+	go node.ApplyToStateMachine()
+
 	// Now we can start listening to client requests
 	// Start the raft replica server and wait for it to initialize
 	go node.start_raft_replica_server(server_address)
@@ -190,10 +192,9 @@ func main() {
 	log.Printf("\nSuccessfully connected to peer replicas.\n")
 	<-node.ready_chan // wait until all connections to our have been established.
 	log.Printf("\nAll peer replicas have successfully connected.\n")
+
 	// this goroutine will keep monitoring all connections and try to re-establish connections that die
 	// go node.MonitorConnections()
-
-	go node.ApplyToStateMachine()
 
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)

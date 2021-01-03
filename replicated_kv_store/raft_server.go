@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -81,9 +80,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	key := params["key"]
 
-	k, _ := strconv.Atoi(key)
-
-	if response, err := node.ReadCommand(k); err == nil {
+	if response, err := node.ReadCommand(key); err == nil {
 
 		prnt_str := "\nRead operation completed. Result: " + response + "\n"
 		fmt.Fprintf(w, prnt_str)

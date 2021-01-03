@@ -2,6 +2,7 @@ package kv_store
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 
@@ -39,29 +40,33 @@ func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 
 //handles all post requests
 func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("\nin posthandler\n")
 	if r.Method != "POST" {
+		log.Printf("Method is not supported.")
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		fmt.Fprintf(w, "ParseForm() err: %v", err)
+		log.Printf("ParseForm() err: %v", err)
 		return
 	}
 
 	kv.mu.Lock()
-	fmt.Fprintf(w, "POST request successful\n")
+
 	value := r.FormValue("value")
 	params := mux.Vars(r)
 	key := params["key"]
 
 	duplicate := kv.Get(key)
 	if duplicate == "Invalid" {
-		fmt.Fprintf(w, "Key = %s\n", key)
-		fmt.Fprintf(w, "Value = %s\n", value)
+		log.Printf("\nKV Store POST request successful\n")
+		log.Printf("Key = %s\n", key)
+		log.Printf("Value = %s\n", value)
 		kv.Push(key, value)
 	} else {
-		fmt.Fprintf(w, "This key already exists")
+		log.Printf("This key already exists")
 	}
 	kv.mu.Unlock()
 }

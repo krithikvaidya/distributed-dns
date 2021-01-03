@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -166,70 +165,61 @@ func (node *RaftNode) ApplyToStateMachine() {
 		// Find which entries we have to apply.
 		node.raft_node_mutex.Lock()
 		log.Printf("\nLocked in ApplyToStateMachine\n")
-		defer node.raft_node_mutex.Unlock()
 
 		var entries []protos.LogEntry
 
 		if node.commitIndex > node.lastApplied {
-			entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit]
+			entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit+1]
 			log.Printf("Operations to be applied to kv_store\n")
 		} else {
 			log.Printf("Fatal: node.commitIndex <= node.lastApplied in ApplyToStateMachine\n")
-			return
+			log.Printf("\nUnLocked in ApplyToStateMachine\n")
+			node.lastApplied = node.lastApplied + to_commit
+			node.raft_node_mutex.Unlock()
+			continue
 		}
 
 		for _, entry := range entries {
-			formData := url.Values{
-				"value": {entry.Operation[2]},
-			}
 
-			timeout := time.Duration(100 * time.Microsecond)
-			client := http.Client{
-				Timeout: timeout,
-			}
-
+			log.Printf("\nentry.Operation[0]: %v", entry.Operation[0])
 			switch entry.Operation[0] {
 
 			case "POST":
+
 				formData := url.Values{
 					"value": {entry.Operation[2]},
 				}
 
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
-				if err != nil {
-					log.Printf("\nError in http.NewRequest: %v\n", err)
-					return
-				}
+				log.Printf("\nHERE\n")
+				url := fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1])
+				resp, err := http.PostForm(url, formData)
 
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do(req): %v\n", err)
-					return
+					log.Printf("\nUnLocked in ApplyToStateMachine\n")
+					node.raft_node_mutex.Unlock()
+					continue
 				}
 
-				defer resp.Body.Close()
-				break
+				resp.Body.Close()
 
-			case "PUT":
+			// case "PUT":
 
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
-				CheckError(err)
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+			// 	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+			// 	CheckError(err)
+			// 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-				resp, err := client.Do(req)
-				CheckError(err)
-				defer resp.Body.Close()
-				break
+			// 	resp, err := client.Do(req)
+			// 	CheckError(err)
+			// 	defer resp.Body.Close()
 
-			case "DELETE":
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(""))
-				CheckError(err)
+			// case "DELETE":
+			// 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:%d/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(""))
+			// 	CheckError(err)
 
-				resp, err := client.Do(req)
-				CheckError(err)
-				defer resp.Body.Close()
+			// 	resp, err := client.Do(req)
+			// 	CheckError(err)
+			// 	defer resp.Body.Close()
 
 			case "NO-OP":
 				log.Printf("\nNO-OP encountered\n")
@@ -241,6 +231,8 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 		}
 		node.lastApplied = node.lastApplied + to_commit
-		log.Println("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+		log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+		log.Printf("\nUnLocked in ApplyToStateMachine\n")
+		node.raft_node_mutex.Unlock()
 	}
 }

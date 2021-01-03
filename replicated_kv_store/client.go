@@ -19,8 +19,9 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 	if node.state == Leader {
 		//append to local log
 
-		log.Printf("\nhere2\n")
 		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+
+		log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
 		var entries []*protos.LogEntry
 		entries = append(entries, &node.log[len(node.log)-1])
@@ -36,13 +37,12 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 		}
 
 		successful_write := make(chan bool)
-		log.Printf("\nbefore leader send aes\n")
+
 		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
-		log.Printf("\nafter leader send aes\n")
+
 		node.raft_node_mutex.Unlock()
 
 		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
-		log.Printf("\nafter leader send aes success\n")
 
 		if success {
 			node.raft_node_mutex.Lock()
@@ -62,7 +62,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 }
 
 // ReadCommand is different since read operations do not need to be added to log
-func (node *RaftNode) ReadCommand(key int) (string, error) {
+func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 	write_success := make(chan bool)
 	node.StaleReadCheck(write_success)
@@ -72,7 +72,7 @@ func (node *RaftNode) ReadCommand(key int) (string, error) {
 
 		// assuming that if an operation on the state machine succeeds on one of the replicas,
 		// it will succeed on all. and vice versa.
-		url := fmt.Sprintf("http://localhost%s/%d", node.kvstore_addr, key)
+		url := fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, key)
 
 		resp, err := http.Get(url)
 

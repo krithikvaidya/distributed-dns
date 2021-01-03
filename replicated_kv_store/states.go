@@ -99,5 +99,10 @@ func (node *RaftNode) ToLeader() {
 	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1), success)
 	<-success
 
+	node.raft_node_mutex.Lock()
+	node.commitIndex++
+	node.raft_node_mutex.Unlock()
+	node.commits_ready <- 1
+
 	go node.HeartBeats()
 }
