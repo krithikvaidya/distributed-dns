@@ -1,7 +1,20 @@
 package main
 
 import (
+<<<<<<< HEAD
 	"log"
+=======
+	"bytes"
+	"context"
+	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync/atomic"
+	"time"
+>>>>>>> ff96df93e362d5940cc07b45ff9d908a46bec8b1
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -100,4 +113,74 @@ func (node *RaftNode) ToLeader() {
 	<-success
 
 	go node.HeartBeats()
+}
+
+func (node *RaftNode) Writeto() {
+	for range node.newCommitReadyChan {
+		// Find which entries we have to apply.
+		node.raft_node_mutex.Lock()
+		//savedTerm := node.currentTerm
+		//savedLastApplied := node.lastApplied
+		var entries []protos.LogEntry
+		if node.commitIndex > node.lastApplied {
+			entries = node.log[node.lastApplied+1 : node.commitIndex+1]
+			node.lastApplied = node.commitIndex
+			log.Printf("Operations to be applied to kv_store\n")
+		} else {
+			return
+		}
+		node.raft_node_mutex.Unlock()
+
+		for _, entry := range entries {
+			formData := url.Values{
+				"value": {entry.Operation[2]},
+			}
+
+			timeout := time.Duration(100 * time.Microsecond)
+			client := http.Client{
+				Timeout: timeout,
+			}
+			Oper := strings.ToLower(entry.Operation[0])
+			switch Oper {
+			case "push":
+				formData := url.Values{
+					"value": {entry.Operation[2]},
+				}
+
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				CheckError(err)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "put":
+
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				CheckError(err)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "delete":
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:%d/%s", node.storePort, entry.Operation[1]), bytes.NewBufferString(""))
+				CheckError(err)
+
+				resp, err := client.Do(req)
+				CheckError(err)
+				defer resp.Body.Close()
+				break
+
+			case "no-op":
+				break
+			}
+
+		}
+		log.Println("Required Operations done to kv_store; In-sync")
+	}
 }

@@ -60,6 +60,8 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nGET request received\n")
 
+	// TODO: Make sure all committed entries are applied before responding to it.
+
 	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
