@@ -12,6 +12,17 @@
 
 - For running tests, use ```go test```.
 
+- #### Making requests from the client:
+
+Assume that the leader is running the server listening for client requests on port :xyzw on localhost.
+
+Use curl to access the key value store and perform any of the CRUD functions<br>
+
+POST request : ```curl -d "value=<value>" -X POST http://localhost:xyzw/<key>```<br>
+GET request : ```curl -X GET  http://localhost:xyzw/<key>```<br>
+PUT request : ```curl -d "value=<value>" -X PUT http://localhost:xyzw/<key>```<br>
+DELETE request : ```curl -X DELETE  http://localhost:xyzw/<key>```<br>
+
 ### Instructions for writing new test cases:
 
 - A **test file** is a single file with a collection of **test cases**.
