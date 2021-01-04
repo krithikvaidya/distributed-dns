@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -19,11 +18,10 @@ import (
 
 var n_replica int
 
-func start_key_value_replica(addr string) {
+// Start the local key-value store's HTTP server
+func StartKVStore(addr string) {
 
-	// Set up the key-value store on the local machine
-
-	kv := kv_store.NewStore() // NewStore() defined in restaccess_key_value.go
+	kv := kv_store.NewStore() // NewStore() defined in kv_store/restaccess_key_value.go
 	r := mux.NewRouter()
 
 	r.HandleFunc("/kvstore", kv.KvstoreHandler).Methods("GET")
@@ -35,13 +33,13 @@ func start_key_value_replica(addr string) {
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)
 
-	CheckError(err)
+	CheckErrorFatal(err)
 
 }
 
-func (node *RaftNode) start_raft_replica_server(addr string) {
+// Start a server to listen for client requests
+func (node *RaftNode) StartRaftServer(addr string) {
 
-	// Start a server to listen for client requests
 	r := mux.NewRouter()
 
 	r.HandleFunc("/test", node.TestHandler).Methods("GET")
@@ -53,7 +51,7 @@ func (node *RaftNode) start_raft_replica_server(addr string) {
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)
 
-	CheckError(err)
+	CheckErrorFatal(err)
 
 }
 
@@ -78,53 +76,55 @@ func init() {
 
 func main() {
 
-	fmt.Println("\nRaft-based Replicated Key Value Store")
+	log.Println("\nRaft-based Replicated Key Value Store\n")
 
-	fmt.Printf("Enter the replica's id: ")
+	log.Printf("Enter the replica's id: ")
 	var rid int32
 	fmt.Scanf("%d", &rid)
 
-	fmt.Printf("\nEnter the TCP network address that the replica should bind to (eg - :7890): ")
+	log.Printf("\nEnter the TCP network address that the replica should bind to (eg - :7890): ")
 	var address string
 	fmt.Scanf("%s", &address)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", address)
-	CheckError(err)
+	CheckErrorFatal(err)
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
-	CheckError(err)
+	CheckErrorFatal(err)
 
-	fmt.Printf("\nSuccessfully bound to address %v\n", address)
+	log.Printf("\nSuccessfully listening at address %v\n", address)
 
 	// Start the local key value store and wait for it to initialize
 	var addresskeyvalue string
-	fmt.Printf("\nEnter the port the key-value replica should listen on: ")
+	log.Printf("\nEnter the port the key-value replica should listen on: ")
 	fmt.Scanf("%s", &addresskeyvalue)
 
-	go start_key_value_replica(addresskeyvalue)
+	go StartKVStore(addresskeyvalue)
 
 	test_addr := fmt.Sprintf("http://localhost%s/kvstore", addresskeyvalue)
 
-	fmt.Printf("\nStarting local key-value store...\n")
+	log.Printf("\nStarting local key-value store...\n")
 
+	// make HTTP request to the test endpoint until a reply is obtained, indicating that
+	// the HTTP server is up
 	for {
 
 		_, err := http.Get(test_addr)
 
 		if err == nil {
-			fmt.Printf("\nKey-value store up and listening at port %s\n", addresskeyvalue)
+			log.Printf("\nKey-value store up and listening at port %s\n", addresskeyvalue)
 			break
 		}
 
 	}
 
 	// Get the address to bind the server that listens to client requests.
-	fmt.Printf("\nEnter the port the replica should listen for client requests on: ")
+	log.Printf("\nEnter the port the replica should listen for client requests on: ")
 	var server_address string
 	fmt.Scanf("%s", &server_address)
 	// Starting the server is done after InitializeNode
 
-	fmt.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
+	log.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
 
 	rep_addrs := make([]string, n_replica)
 
@@ -143,22 +143,22 @@ func main() {
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
 
-	go node.ApplyToStateMachine()
+	go node.ApplyToStateMachine() // ApplyToStateMachine defined in raft_node.go
 
 	// Now we can start listening to client requests
 	// Start the raft replica server and wait for it to initialize
-	go node.start_raft_replica_server(server_address)
+	go node.StartRaftServer(server_address)
 
 	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
 
-	fmt.Printf("\nStarting raft replica server...\n")
+	log.Printf("\nStarting raft replica server...\n")
 
 	for {
 
 		_, err := http.Get(test_addr)
 
 		if err == nil {
-			fmt.Printf("\nRaft replica server up and listening at port %s\n", server_address)
+			log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
 			break
 		}
 
@@ -172,29 +172,24 @@ func main() {
 	go func() {
 
 		err := grpcServer.Serve(listener)
-
-		if err != nil {
-			log.Printf("\nError in gRPC Serve: %v\n", err)
-			os.Exit(1)
-		}
+		CheckErrorFatal(err)
 
 	}()
 
-	fmt.Printf("\ngRPC server listening...\n")
+	log.Printf("\ngRPC server listening...\n")
 
-	fmt.Printf("\nPress enter when all other nodes are online.\n")
+	log.Printf("\nPress enter when all other nodes are online.\n")
 	var input rune
 	fmt.Scanf("%c", &input)
 
 	// Attempt to gRPC dial to other replicas. ConnectToPeerReplicas is defined in raft_node.go
-	fmt.Printf("\nAttempting to connect to peer replicas...\n")
+	log.Printf("\nAttempting to connect to peer replicas...\n")
 	node.ConnectToPeerReplicas(rep_addrs)
-	log.Printf("\nSuccessfully connected to peer replicas.\n")
-	<-node.ready_chan // wait until all connections to our have been established.
-	log.Printf("\nAll peer replicas have successfully connected.\n")
+	log.Printf("\nSuccessfully connected to peer replicas.\n") // established connection to all other nodes
 
-	// this goroutine will keep monitoring all connections and try to re-establish connections that die
-	// go node.MonitorConnections()
+	<-node.ready_chan // wait until all connections to our node have been established.
+
+	log.Printf("\nAll peer replicas have successfully connected.\n")
 
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)

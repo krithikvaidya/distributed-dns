@@ -11,12 +11,8 @@ import (
 // Test handler
 func (node *RaftNode) TestHandler(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method != "GET" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-
 	fmt.Fprintf(w, "\nServer is up\n\n")
+
 }
 
 //handles all post requests
@@ -29,18 +25,13 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.RLock()
-	log.Printf("\nRlock acquired in PostHandler\n")
+	node.raft_node_mutex.Lock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		log.Printf("\nRlock released in PostHandler\n")
-		node.raft_node_mutex.RUnlock()
+		node.raft_node_mutex.Unlock()
 		return
 	}
-
-	log.Printf("\nRlock released in PostHandler\n")
-	node.raft_node_mutex.RUnlock()
 
 	value := r.FormValue("value")
 	params := mux.Vars(r)
@@ -51,7 +42,7 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	operation[1] = key
 	operation[2] = value
 
-	if node.WriteCommand(operation) {
+	if node.WriteCommand(operation) { // Mutex will be unlocked in WriteCommand
 		fmt.Fprintf(w, "\nSuccessful POST\n")
 	} else {
 		fmt.Fprintf(w, "\nPOST request failed to be completed.\n")
@@ -73,8 +64,6 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.RUnlock()
-
 	params := mux.Vars(r)
 	key := params["key"]
 
@@ -84,7 +73,9 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, prnt_str)
 
 	} else {
+
 		fmt.Fprintf(w, "\nRead failed with error %v\n", err)
+
 	}
 }
 

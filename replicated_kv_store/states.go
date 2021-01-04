@@ -52,7 +52,7 @@ func (node *RaftNode) ToLeader() {
 	node.matchIndex = make([]int32, node.n_replicas, node.n_replicas)
 
 	// initialize nextIndex, matchIndex
-	for replica_id := 0; replica_id < len(node.peer_replica_clients); replica_id++ {
+	for replica_id := int32(0); replica_id < node.n_replicas; replica_id++ {
 
 		if int32(replica_id) == node.replica_id {
 			continue

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -12,10 +13,18 @@ import (
 // To send AppendEntry to single replica, and retry if needed.
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) (status bool) {
 
-	response, err := client_obj.AppendEntries(context.Background(), msg)
+	var response *protos.AppendEntriesResponse
+	var err error
 
-	if err != nil {
-		// ...
+	for {
+
+		response, err = client_obj.AppendEntries(context.Background(), msg)
+
+		if err == nil {
+			break
+		}
+
+		log.Printf(Red + "[Error]" + Reset + ": " + err.Error())
 	}
 
 	if response.Success == false {
@@ -174,7 +183,7 @@ func (node *RaftNode) HeartBeats() {
 		node.raft_node_mutex.RUnlock()
 
 		success := make(chan bool)
-		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)), success)
+		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)
 		<-success
 
 	}

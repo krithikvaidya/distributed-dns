@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 	"runtime"
 )
 
@@ -33,11 +32,10 @@ func init() {
 	}
 }
 
-func CheckError(err error) {
+func CheckErrorFatal(err error) {
 
 	if err != nil {
-		log.Fatalf(Red + "[Error]" + Reset + ": " + err.Error())
-		os.Exit(1)
+		log.Fatalf(Red + "[Fatal Error]" + Reset + ": " + err.Error()) // The Fatalf functions call os.Exit(1) after writing the log message.
 	}
 
 }

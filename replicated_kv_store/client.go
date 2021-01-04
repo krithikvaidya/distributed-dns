@@ -10,15 +10,13 @@ import (
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
-//WriteCommand allows clients to submit a new command to the leader
+//WriteCommand is called when the client sends the replica a write request.
 func (node *RaftNode) WriteCommand(operation []string) bool {
 
-	node.raft_node_mutex.Lock()
-
-	// True only if leader
+	// Perform operation only if leader
 	if node.state == Leader {
-		//append to local log
 
+		//append to local log
 		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
 
 		// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
@@ -40,7 +38,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 
 		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
 
-		node.raft_node_mutex.Unlock()
+		node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
 
 		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
 
@@ -66,7 +64,11 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 	write_success := make(chan bool)
 	node.StaleReadCheck(write_success)
+	node.raft_node_mutex.RUnlock()
 	status := <-write_success
+
+	node.raft_node_mutex.RLock()
+	defer node.raft_node_mutex.RUnlock()
 
 	if (status == true) && (node.state == Leader) {
 
@@ -79,14 +81,22 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 		if err == nil {
 
 			defer resp.Body.Close()
-			contents, err := ioutil.ReadAll(resp.Body)
+			contents, err2 := ioutil.ReadAll(resp.Body)
+
+			if err2 != nil {
+				log.Printf(Red + "[Error]" + Reset + ": " + err2.Error())
+				return "unable to perform read", err2
+
+			}
 
 			log.Printf("\nREAD successful.\n")
 
-			return string(contents), err
+			return string(contents), nil
 
 		} else {
-			return "error occured", err
+
+			log.Printf(Red + "[Error]" + Reset + ": " + err.Error())
+
 		}
 	}
 
@@ -98,8 +108,6 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 	replica_id := 0
 
 	var entries []*protos.LogEntry
-
-	node.raft_node_mutex.RLock()
 
 	prevLogIndex := node.nextIndex[replica_id] - 1
 	prevLogTerm := int32(-1)
@@ -118,7 +126,5 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 		Entries:      entries,
 	}
 
-	node.raft_node_mutex.RUnlock()
-
-	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)), write_success)
+	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), write_success)
 }

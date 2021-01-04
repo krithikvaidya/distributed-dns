@@ -98,7 +98,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		}
 
 		connxn, err := grpc.Dial(rep_addrs[i], grpc.WithInsecure())
-		CheckError(err)
+		CheckErrorFatal(err)
 
 		// Obtain client stub
 		cli := protos.NewConsensusServiceClient(connxn)
@@ -110,7 +110,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 		// ReplicaReady is an RPC defined to inform the other replica about our connection
 		_, err = cli.ReplicaReady(ctx, &empty.Empty{})
-		CheckError(err)
+		CheckErrorFatal(err)
 
 		log.Printf("\nConnected to replica %v\n", i)
 

@@ -12,22 +12,19 @@ import (
 
 // RunElectionTimer runs an election if no heartbeat is received
 func (node *RaftNode) RunElectionTimer() {
-	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
-	//150 - 300 ms random time was mentioned in the paper
 
-	// go node.ElectionStopper(start)
+	// 150 - 300 ms random timeout was mentioned in the paper
+	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 
 	select {
 
-	case <-time.After(duration): //for timeout to call election
+	case <-time.After(duration): // for timeout to call election
 
 		log.Printf("\nElection timer runs out.\n")
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
-		node.raft_node_mutex.Lock()
-		// log.Printf("\nLocked in RunElectionTimer\n")
 
-		node.electionTimerRunning = false
+		node.raft_node_mutex.Lock()
 		node.ToCandidate()
 
 		// log.Printf("\nUnlocked in AppendEntries\n")
@@ -134,6 +131,6 @@ func (node *RaftNode) StartElection() {
 
 	}
 
-	node.electionTimerRunning = false
-	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
+	node.electionTimerRunning = false // will be true only when in follower state and election timer is running
+	go node.RunElectionTimer()        // begin the timer during which this candidate waits for votes
 }
