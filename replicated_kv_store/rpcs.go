@@ -11,16 +11,13 @@ import (
 // RPC declared in protos/replica.proto.
 // When a replica performs the gRPC dial to another replica and obtains the
 // corresponding client stub, it will invoke this RPC to inform the other replica
-// that it has connected.
+// that it has connected. (This RPC might be unnecessary if the initial setup procedure is refined)
 func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
 
 	log.Printf("\nReceived ReplicaReady Notification\n")
 
-	// log.Printf("\nrw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
+	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
-	log.Printf("\nLocked in ReplicaReady\n")
-
-	// log.Printf("\nObtained ReplicaReady Lock\n")
 
 	node.replicas_ready += 1
 
@@ -29,7 +26,6 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 		// Using defer does not work here. Not sure why
 		go func(node *RaftNode) {
 
-			// log.Printf("\nIn ready chan send goroutine\n")
 			node.ready_chan <- true
 
 		}(node)
@@ -38,21 +34,16 @@ func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty
 
 	}
 
-	// log.Printf("\nPerform ReplicaReady Unlock\n")
-	// log.Printf("\nUnLocked in ReplicaReady\n")
 	node.raft_node_mutex.Unlock()
-	// log.Printf("\nrw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
+	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 
 	return &empty.Empty{}, nil
 }
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
-	// fmt.Printf("\nreceived requestvote\n")
-
-	// log.Printf("\nIn RequestVote. rw write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
+	// log.Printf("\nIn RequestVote. RWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
-	log.Printf("\nLocked in RequestVote\n")
 
 	node_current_term := node.currentTerm
 	latestLogIndex := int32(-1)
@@ -86,14 +77,13 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 		log.Printf("\nGranting vote\n")
 
-		log.Printf("\nUnLocked in RequestVote\n")
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
 
 	} else {
 
 		log.Printf("\nRejecting vote\n")
-		log.Printf("\nUnLocked in RequestVote\n")
+
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
 
@@ -104,13 +94,11 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
-	// log.Printf("\nLocked in AppendEntries\n")
 
 	// term received is lesser than current term
 	if node.currentTerm > in.Term {
 
 		node.raft_node_mutex.Unlock()
-		// log.Printf("\nUnLocked in AppendEntries\n")
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
@@ -174,6 +162,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			old_commit_index := node.commitIndex
 
+			log.Printf("\nin.LeaderCommit %v node.commitIndex %v int32(len(node.log)-1) %v\n", in.LeaderCommit, node.commitIndex, int32(len(node.log)-1))
+
 			if in.LeaderCommit < int32(len(node.log)-1) {
 
 				node.commitIndex = in.LeaderCommit
@@ -184,13 +174,11 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			}
 
-			// log.Printf("\nUnLocked in AppendEntries\n")
 			node.raft_node_mutex.Unlock()
 
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		} else {
-			// log.Printf("\nUnLocked in AppendEntries\n")
 			node.raft_node_mutex.Unlock()
 		}
 
@@ -198,7 +186,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
-		// log.Printf("\nUnLocked in AppendEntries\n")
 		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil

@@ -2,29 +2,23 @@ package main
 
 import (
 	"context"
-	"log"
 	"sync/atomic"
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
-	"github.com/tevino/abool"
 )
 
-// To send AppendEntry to single replica, and retry if needed.
+// To send AppendEntry to single replica, and retry if needed (called by LeaderSendAEs defined below).
 func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) (status bool) {
 
 	var response *protos.AppendEntriesResponse
 	var err error
 
-	for {
+	// Call the AppendEntries RPC for the given client
+	response, err = client_obj.AppendEntries(context.Background(), msg)
 
-		response, err = client_obj.AppendEntries(context.Background(), msg)
-
-		if err == nil {
-			break
-		}
-
-		log.Printf(Red + "[Error]" + Reset + ": " + err.Error())
+	if err != nil {
+		return false
 	}
 
 	if response.Success == false {
@@ -40,7 +34,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		}
 
 		// will reach here if response.Term <= node.currentTerm and response.Success == false
-
+		// decrement nextIndex and retry the RPC, and keep repeating until it succeeds
 		node.nextIndex[replica_id]--
 
 		var entries []*protos.LogEntry
@@ -70,6 +64,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 
 	} else {
 
+		// AppendEntries for given client successful.
 		node.nextIndex[replica_id] = upper_index + 1
 		node.matchIndex[replica_id] = upper_index
 
@@ -84,13 +79,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	replica_id := int32(0)
 
-	// node.raft_node_mutex.RLock() // for node.peer_replica_clients.
-	// defer node.raft_node_mutex.RUnlock()
-	// (The above are not required, since in the current implementation it doesnt change after initialization)
-
 	successes := int32(1)
-
-	channel_closed := abool.New() // atomic boolean variable
 
 	for _, client_obj := range node.peer_replica_clients {
 
@@ -99,36 +88,29 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool, channel_closed *abool.AtomicBool) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.Lock()
-			// log.Printf("\nLocked in LeaderSendAEs spawned goroutine\n")
 
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
-				tot_success := atomic.AddInt32(&successes, 1)
-				if tot_success > (node.n_replicas)/2 {
 
-					if channel_closed.IsNotSet() {
-						successful_write <- true
-						channel_closed.Set()
-						close(successful_write)
-					}
+				tot_success := atomic.AddInt32(&successes, 1)
+
+				if tot_success == (node.n_replicas)/2+1 { // write quorum achieved
+
+					successful_write <- true // indicate to the calling function that the operation was perform successfully.
 
 				}
+
 			} else {
 
-				if channel_closed.IsNotSet() {
-					successful_write <- false
-					channel_closed.Set()
-					close(successful_write)
-				}
+				successful_write <- false // indicate to the calling function that the operation failed.
 
 			}
 
-			// log.Printf("\nUnLocked in LeaderSendAEs spawned goroutine\n")
 			node.raft_node_mutex.Unlock()
 
-		}(node, client_obj, replica_id, upper_index, successful_write, channel_closed)
+		}(node, client_obj, replica_id, upper_index, successful_write)
 
 		replica_id++
 
@@ -136,8 +118,8 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 }
 
-//HeartBeats is a goroutine that periodically makes leader
-//send heartbeats as long as it is the leader
+// HeartBeats is a goroutine that periodically makes leader
+// send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -148,11 +130,9 @@ func (node *RaftNode) HeartBeats() {
 		<-ticker.C
 
 		node.raft_node_mutex.RLock()
-		// log.Printf("\nRLock in HeartBeats\n")
 
 		if node.state != Leader {
 
-			// log.Printf("\nRunLock in HeartBeats\n")
 			node.raft_node_mutex.RUnlock()
 			return
 		}
@@ -179,7 +159,6 @@ func (node *RaftNode) HeartBeats() {
 			Entries:      entries,
 		}
 
-		// log.Printf("\nRUnlock in HeartBeats\n")
 		node.raft_node_mutex.RUnlock()
 
 		success := make(chan bool)

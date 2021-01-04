@@ -92,7 +92,6 @@ func (node *RaftNode) ToLeader() {
 		Entries:      entries,
 	}
 
-	log.Printf("\nUnlock in ToLeader()\n")
 	node.raft_node_mutex.Unlock()
 
 	success := make(chan bool)

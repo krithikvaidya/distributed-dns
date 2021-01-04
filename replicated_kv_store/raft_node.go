@@ -34,9 +34,9 @@ type RaftNode struct {
 	replica_id           int32                           // The unique ID for the current replica
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
 	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
-	electionTimerRunning bool
-	kvstore_addr         string     //to store respective port on which replicated key value store is running
-	commits_ready        chan int32 // Channel to signal once commit has been made
+	electionTimerRunning bool                            // will be true if the node is a follower and the election timer is running
+	kvstore_addr         string                          // stores respective port on which local key value store is running
+	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
 
 	// States mentioned in figure 2 of the paper:
 
@@ -45,14 +45,14 @@ type RaftNode struct {
 	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
 	log         []protos.LogEntry // The array of the log entry structs
 
-	// State to be maintained on all replicas
+	// State to be maintained on all replicas (unpersisted)
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
 	commitIndex        int32         // Index of the highest long entry known to be committed
 	lastApplied        int32         // Index of the highest log entry applied to the state machine
 	state              RaftNodeState // The current state of the node(eg. Candidate, Leader, etc)
 
-	// State to be maintained on the leader
+	// State to be maintained on the leader (unpersisted)
 	nextIndex  []int32 // Indices of the next log entry to send to each server
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 }
@@ -116,45 +116,17 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	}
 
-	go node.RunElectionTimer()
-
 	node.raft_node_mutex.Lock()
-	log.Printf("\nLocked in ConnectToPeerReplicas\n")
+
+	go node.RunElectionTimer() // RunElectionTimer defined in election.go
 
 	node.electionTimerRunning = true
 	node.peer_replica_clients = client_objs
 
-	log.Printf("\nUnLocked in ConnectedTOPeerReplicas\n")
 	node.raft_node_mutex.Unlock()
 }
 
-// this goroutine will keep monitoring all connections and try to re-establish connections that die
-// func (node *RaftNode) MonitorConnections() {
-
-// 	for {
-
-// 		for i := 0; i < node.n_replicas; i++ {
-
-// 			if i == node.replica_id {
-// 				continue
-// 			}
-
-// 			response, err := cli.ReplicaReady(context.Background(), &empty.Empty{})
-
-// 			conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
-// 			if err != nil {
-// 				log.Fatalf("Did not connect: %v", err)
-// 			}
-
-// 		}
-
-// 		time.Sleep(1 * time.Second)
-
-// 	}
-
-// }
-
-// Apply committed entries to our state machine.
+// Apply committed entries to our key-value store.
 func (node *RaftNode) ApplyToStateMachine() {
 
 	for {
@@ -163,12 +135,11 @@ func (node *RaftNode) ApplyToStateMachine() {
 		to_commit := <-node.commits_ready
 		log.Printf("\nReceived commit(s)\n")
 
-		// Find which entries we have to apply.
 		node.raft_node_mutex.Lock()
-		// log.Printf("\nLocked in ApplyToStateMachine\n")
 
 		var entries []protos.LogEntry
 
+		// Get the entries that are uncommited and need to be applied.
 		entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit+1]
 
 		for _, entry := range entries {

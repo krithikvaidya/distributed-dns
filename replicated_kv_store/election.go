@@ -33,7 +33,6 @@ func (node *RaftNode) RunElectionTimer() {
 		return
 
 	case <-node.stopElectiontimer: //to stop timer
-		node.electionTimerRunning = false
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received

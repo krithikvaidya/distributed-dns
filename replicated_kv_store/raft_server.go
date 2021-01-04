@@ -89,15 +89,13 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.RLock()
+	node.raft_node_mutex.Lock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
-
-	node.raft_node_mutex.RUnlock()
 
 	value := r.FormValue("value")
 	params := mux.Vars(r)
@@ -121,15 +119,13 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nDELETE request received\n")
 
-	node.raft_node_mutex.RLock()
+	node.raft_node_mutex.Lock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
-
-	node.raft_node_mutex.RUnlock()
 
 	params := mux.Vars(r)
 	key := params["key"]
