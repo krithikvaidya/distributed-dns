@@ -57,14 +57,14 @@ type RaftNode struct {
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 }
 
-func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode {
+func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 	rn := &RaftNode{
 
 		n_replicas:           n_replica,
 		ready_chan:           make(chan bool),
 		replicas_ready:       0,
-		replica_id:           rid,
+		replica_id:           int32(rid),
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
 		state:                Follower, // all nodes are initialized as followers
 		electionTimerRunning: false,
