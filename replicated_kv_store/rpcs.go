@@ -97,7 +97,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	// term received is lesser than current term
 	if node.currentTerm > in.Term {
-		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 

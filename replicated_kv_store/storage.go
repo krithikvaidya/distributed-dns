@@ -39,7 +39,7 @@ func (stored *Storage) writeFile(filename string) {
 }
 
 func (stored *Storage) readFile(filename string) {
-	dataFile, err := os.Open("integerdata.gob")
+	dataFile, err := os.Open(filename)
 
 	if err != nil {
 		fmt.Println(err)
@@ -68,10 +68,10 @@ func (stored *Storage) Get(key string, filename string) ([]byte, bool) {
 	return value, check
 }
 
-func (stored *Storage) Set(key string, valuealue []byte, filename string) {
+func (stored *Storage) Set(key string, value []byte, filename string) {
 	stored.mu.Lock()
 	defer stored.mu.Unlock()
-	stored.m[key] = valuealue
+	stored.m[key] = value
 	stored.writeFile(filename)
 }
 
