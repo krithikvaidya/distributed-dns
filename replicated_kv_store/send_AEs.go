@@ -108,7 +108,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				if node.n_replicas-tot_fail < (node.n_replicas)/2+1 {
+				if tot_fail == (node.n_replicas+1)/2 {
 					log.Printf("%d return fail\n", replica_id)
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
