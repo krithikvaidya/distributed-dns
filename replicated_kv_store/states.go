@@ -14,7 +14,7 @@ func (node *RaftNode) ToFollower(term int32) {
 	node.currentTerm = term
 	node.votedFor = -1
 
-	// If node was a leader or candidate, start election timer. Else if it was a candidate, reset the election timer.
+	// If node was a leader or candidate, start election timer. Else if it was a follower, reset the election timer.
 	if prevState == Leader || prevState == Candidate {
 		node.electionTimerRunning = true
 		go node.RunElectionTimer()

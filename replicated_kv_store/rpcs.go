@@ -103,7 +103,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	} else if node.currentTerm < in.Term {
 
-		// current term is lesser than received term, we transition into being a candidate and reset timer and update term
+		// current term is lesser than received term, we transition into being a follower and reset timer and update term
 		node.ToFollower(in.Term)
 
 	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {

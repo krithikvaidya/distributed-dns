@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -14,6 +15,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var response *protos.AppendEntriesResponse
 	var err error
 
+	//log.Printf("IN %d\n", replica_id)
 	// Call the AppendEntries RPC for the given client
 	response, err = client_obj.AppendEntries(context.Background(), msg)
 
@@ -81,6 +83,8 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	successes := int32(1)
 
+	failures := int32(0)
+
 	for _, client_obj := range node.peer_replica_clients {
 
 		if replica_id == node.replica_id {
@@ -91,24 +95,27 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.Lock()
+			//log.Printf("Lock on %d", replica_id)
 
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
-
 				tot_success := atomic.AddInt32(&successes, 1)
 
 				if tot_success == (node.n_replicas)/2+1 { // write quorum achieved
-
+					log.Printf("%d return success\n", replica_id)
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
-
 				}
 
 			} else {
+				tot_fail := atomic.AddInt32(&failures, 1)
 
-				successful_write <- false // indicate to the calling function that the operation failed.
-
+				if node.n_replicas-tot_fail < (node.n_replicas)/2+1 {
+					log.Printf("%d return fail\n", replica_id)
+					successful_write <- false // indicate to the calling function that the operation failed.
+				}
 			}
-
+			//log.Printf("Trying to Unlock on %d\n", replica_id)
 			node.raft_node_mutex.Unlock()
+			//log.Printf("Unlock on %d", replica_id)
 
 		}(node, client_obj, replica_id, upper_index, successful_write)
 
@@ -122,22 +129,22 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(3000 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 
 		<-ticker.C
-
+		//log.Println("\nasking for Rlock")
 		node.raft_node_mutex.RLock()
-
+		//log.Println("\ngot Rlock")
 		if node.state != Leader {
 
 			node.raft_node_mutex.RUnlock()
 			return
 		}
 
-		replica_id := 0
+		replica_id := node.replica_id
 
 		prevLogIndex := node.nextIndex[replica_id] - 1
 		prevLogTerm := int32(-1)
