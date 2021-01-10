@@ -138,10 +138,10 @@ func main() {
 
 	}
 
-	grpcServer := grpc.NewServer()
-
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
+
+	grpcServer := grpc.NewServer()
 
 	go node.ApplyToStateMachine() // ApplyToStateMachine defined in raft_node.go
 
