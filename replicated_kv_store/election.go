@@ -86,9 +86,9 @@ func (node *RaftNode) StartElection() {
 			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
+				log.Printf("\nReceived reply from %v\n", replica_id)
 
 				if node.state != Candidate {
-					// log.Printf("\nUnlock in StartElection after response\n")
 					node.raft_node_mutex.Unlock()
 					return
 				}
@@ -96,7 +96,6 @@ func (node *RaftNode) StartElection() {
 				if response.Term > node.currentTerm { // the response node has higher term than current one
 
 					node.ToFollower(response.Term)
-					// log.Printf("\nUnlock in StartElection after response\n")
 					node.raft_node_mutex.Unlock()
 					return
 
@@ -104,6 +103,7 @@ func (node *RaftNode) StartElection() {
 
 					if response.VoteGranted {
 
+						log.Printf("\nReceived vote from %v\n", replica_id)
 						votes := int(atomic.AddInt32(&received_votes, 1))
 
 						if votes*2 > int(node.n_replicas) { // won the Election
@@ -119,10 +119,10 @@ func (node *RaftNode) StartElection() {
 			} else {
 
 				log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
-				// log.Printf("\nUnlock in StartElection after response\n")
-				node.raft_node_mutex.Unlock()
 
 			}
+
+			node.raft_node_mutex.Unlock()
 
 		}(node, client_obj, replica_id)
 

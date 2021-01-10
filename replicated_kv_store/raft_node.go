@@ -61,7 +61,7 @@ type RaftNode struct {
 	fileStored string  //Name of file where things are stored
 }
 
-func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode {
+func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 	rn := &RaftNode{
 
@@ -75,6 +75,15 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 		kvstore_addr:          keyvalue_port,
 		commits_ready:         make(chan int32),
 		commits_applied_to_kv: make(chan bool),
+		n_replicas:            n_replica,
+		ready_chan:            make(chan bool),
+		replicas_ready:        0,
+		replica_id:            int32(rid),
+		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
+		state:                 Follower, // all nodes are initialized as followers
+		electionTimerRunning:  false,
+		kvstore_addr:          keyvalue_port,
+		commits_ready:         make(chan int32),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
