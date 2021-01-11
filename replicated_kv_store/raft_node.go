@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,16 +29,16 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
-	n_replicas           int32                           // The number of replicas in the current replicated system
-	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int32                           // The unique ID for the current replica
-	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
-	electionTimerRunning bool                            // will be true if the node is a follower and the election timer is running
-	kvstore_addr         string                          // stores respective port on which local key value store is running
-	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
-
+	ready_chan            chan bool                       // Channel to signal whether the node is ready for operation
+	n_replicas            int32                           // The number of replicas in the current replicated system
+	replicas_ready        int32                           // number of replicas that have connected to this replica's gRPC server.
+	replica_id            int32                           // The unique ID for the current replica
+	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
+	raft_node_mutex       sync.RWMutex                    // The mutex for working with the RaftNode struct
+	electionTimerRunning  bool                            // will be true if the node is a follower and the election timer is running
+	kvstore_addr          string                          // stores respective port on which local key value store is running
+	commits_ready         chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
+	commits_applied_to_kv chan bool                       // Channel to indicate completion of changes applied to key value store
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
@@ -55,21 +56,34 @@ type RaftNode struct {
 	// State to be maintained on the leader (unpersisted)
 	nextIndex  []int32 // Indices of the next log entry to send to each server
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
+
+	storage    Storage // Used for Persistence
+	fileStored string  //Name of file where things are stored
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 	rn := &RaftNode{
 
-		n_replicas:           n_replica,
-		ready_chan:           make(chan bool),
-		replicas_ready:       0,
-		replica_id:           int32(rid),
-		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		state:                Follower, // all nodes are initialized as followers
-		electionTimerRunning: false,
-		kvstore_addr:         keyvalue_port,
-		commits_ready:        make(chan int32),
+		n_replicas:            n_replica,
+		ready_chan:            make(chan bool),
+		replicas_ready:        0,
+		replica_id:            rid,
+		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
+		state:                 Follower, // all nodes are initialized as followers
+		electionTimerRunning:  false,
+		kvstore_addr:          keyvalue_port,
+		commits_ready:         make(chan int32),
+		commits_applied_to_kv: make(chan bool),
+		n_replicas:            n_replica,
+		ready_chan:            make(chan bool),
+		replicas_ready:        0,
+		replica_id:            int32(rid),
+		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
+		state:                 Follower, // all nodes are initialized as followers
+		electionTimerRunning:  false,
+		kvstore_addr:          keyvalue_port,
+		commits_ready:         make(chan int32),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -79,6 +93,12 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		electionResetEvent: make(chan bool),
 		commitIndex:        -1, // index of highest log entry known to be committed.
 		lastApplied:        -1, // index of highest log entry applied to state machine.
+		storage:            NewStorage(),
+		fileStored:         keyvalue_port[1:],
+	}
+
+	if rn.storage.HasData(rn.fileStored) {
+		rn.restoreFromStorage(rn.storage)
 	}
 
 	return rn
@@ -124,6 +144,41 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	node.peer_replica_clients = client_objs
 
 	node.raft_node_mutex.Unlock()
+}
+
+func (node *RaftNode) restoreFromStorage(storage Storage) {
+	if termvalue, check := node.storage.Get("currentTerm", node.fileStored); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
+		temp.Decode(&node.currentTerm)
+	} else {
+		log.Printf("\ncurrentTerm not found in storage")
+	}
+	if votedcheck, check := node.storage.Get("votedFor", node.fileStored); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
+		temp.Decode(&node.votedFor)
+	} else {
+		log.Printf("\nvotedFor not found in storage")
+	}
+	if logentries, check := node.storage.Get("log", node.fileStored); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
+		temp.Decode(&node.log)
+	} else {
+		log.Printf("\nlog not found in storage")
+	}
+}
+
+func (node *RaftNode) persistToStorage() {
+	var termvalue bytes.Buffer
+	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
+	node.storage.Set("currentTerm", termvalue.Bytes(), node.fileStored)
+
+	var votedcheck bytes.Buffer
+	gob.NewEncoder(&votedcheck).Encode(node.votedFor)
+	node.storage.Set("votedFor", votedcheck.Bytes(), node.fileStored)
+
+	var logentries bytes.Buffer
+	gob.NewEncoder(&logentries).Encode(node.log)
+	node.storage.Set("log", logentries.Bytes(), node.fileStored)
 }
 
 // Apply committed entries to our key-value store.
@@ -223,6 +278,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 		}
 
 		node.lastApplied = node.lastApplied + to_commit
+		node.commits_applied_to_kv <- true
 		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
 		node.raft_node_mutex.Unlock()
 	}
