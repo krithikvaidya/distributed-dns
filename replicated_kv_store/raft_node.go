@@ -89,7 +89,10 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 	}
 
 	if rn.storage.HasData(rn.fileStored) {
+		fmt.Println("Oh no")
 		rn.restoreFromStorage(rn.storage)
+	} else {
+		fmt.Println("Here")
 	}
 
 	return rn

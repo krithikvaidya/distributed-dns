@@ -14,7 +14,7 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(10000+rand.Intn(5000)) * time.Millisecond
+	duration := time.Duration(150+rand.Intn(300)) * time.Millisecond
 
 	select {
 

@@ -76,7 +76,6 @@ func (stored *Storage) Set(key string, value []byte, filename string) {
 }
 
 func (stored *Storage) HasData(filename string) bool {
-	stored.readFile(filename)
 	stored.mu.Lock()
 	defer stored.mu.Unlock()
 	return len(stored.m) > 0
