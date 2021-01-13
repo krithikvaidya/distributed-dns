@@ -2,16 +2,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -109,22 +106,27 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 			continue
 		}
 
-		connxn, err := grpc.Dial(rep_addrs[i], grpc.WithInsecure())
-		CheckErrorFatal(err)
+		go func(id int32) {
+			connxn, err := grpc.Dial(rep_addrs[id], grpc.WithInsecure())
+			for err != nil {
+				connxn, err = grpc.Dial(rep_addrs[id], grpc.WithInsecure())
+			}
+			CheckErrorFatal(err)
 
-		// Obtain client stub
-		cli := protos.NewConsensusServiceClient(connxn)
+			// Obtain client stub
+			cli := protos.NewConsensusServiceClient(connxn)
 
-		client_objs[i] = cli
+			client_objs[id] = cli
 
-		clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
-		ctx, _ := context.WithDeadline(context.Background(), clientDeadline)
+			log.Printf("\nConnected to replica %v\n", id)
+			/*clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
+			ctx, _ := context.WithDeadline(context.Background(), clientDeadline)*/
+
+		}(i)
 
 		// ReplicaReady is an RPC defined to inform the other replica about our connection
-		_, err = cli.ReplicaReady(ctx, &empty.Empty{})
-		CheckErrorFatal(err)
-
-		log.Printf("\nConnected to replica %v\n", i)
+		/*_, err = cli.ReplicaReady(ctx, &empty.Empty{})
+		CheckErrorFatal(err)*/
 
 	}
 

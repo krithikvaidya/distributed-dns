@@ -178,10 +178,10 @@ func main() {
 	node.ConnectToPeerReplicas(rep_addrs)
 	log.Printf("\nSuccessfully connected to peer replicas.\n") // established connection to all other nodes
 
-	<-node.ready_chan // wait until all connections to our node have been established.
-
+	/*<-node.ready_chan // wait until all connections to our node have been established.
+	//Need to remove these 2 lines soon -NOOOOOOOTEEEEEE
 	log.Printf("\nAll peer replicas have successfully connected.\n")
-
+	*/
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)
 	<-all_connected

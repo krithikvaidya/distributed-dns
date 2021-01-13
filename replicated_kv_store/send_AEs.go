@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -92,6 +91,10 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
+		if client_obj == nil {
+			continue
+		}
+
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.Lock()
@@ -108,7 +111,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				log.Printf("Sending AE FAILED for replica %v\n", replica_id)
+				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
 
 				if tot_fail == (node.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
@@ -130,7 +133,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(2000 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
