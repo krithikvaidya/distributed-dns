@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -107,10 +108,20 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		}
 
 		go func(id int32) {
-			connxn, err := grpc.Dial(rep_addrs[id], grpc.WithInsecure())
-			for err != nil {
-				connxn, err = grpc.Dial(rep_addrs[id], grpc.WithInsecure())
+			var online bool = false
+			for online != true {
+				conn, err := net.Dial("tcp", rep_addrs[id])
+				if err != nil {
+					//log.Println("Connection error:", err)
+					online = false
+				} else {
+					online = true
+					conn.Close()
+				}
+				client_objs[id] = nil
 			}
+
+			connxn, err := grpc.Dial(rep_addrs[id], grpc.WithInsecure())
 			CheckErrorFatal(err)
 
 			// Obtain client stub
@@ -118,16 +129,14 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 			client_objs[id] = cli
 
-			log.Printf("\nConnected to replica %v\n", id)
 			/*clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
-			ctx, _ := context.WithDeadline(context.Background(), clientDeadline)*/
+			ctx, _ := context.WithDeadline(context.Background(), clientDeadline)
+			// ReplicaReady is an RPC defined to inform the other replica about our connection
+			_, err = cli.ReplicaReady(ctx, &empty.Empty{})
+			CheckErrorFatal(err)*/
 
+			log.Printf("\nConnected to replica %v\n", id)
 		}(i)
-
-		// ReplicaReady is an RPC defined to inform the other replica about our connection
-		/*_, err = cli.ReplicaReady(ctx, &empty.Empty{})
-		CheckErrorFatal(err)*/
-
 	}
 
 	node.raft_node_mutex.Lock()

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -111,7 +112,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
+				log.Printf("Sending AE FAILED for replica %v\n", replica_id)
 
 				if tot_fail == (node.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
