@@ -77,7 +77,11 @@ func (stored *Storage) HasData(filename string) bool {
 	stored.mu.RLock()
 	defer stored.mu.RUnlock()
 
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
+	fi, err := os.Stat(filename)
+
+	if os.IsNotExist(err) {
+		return false
+	} else if fi.Size() == 0 {
 		return false
 	}
 
