@@ -9,7 +9,7 @@ import (
 
 // Storage is a simple in-memory implementation of Storage for testing.
 type Storage struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 	m  map[string][]byte
 }
 
@@ -31,8 +31,6 @@ func (stored *Storage) writeFile(filename string) {
 	// serialize the data
 	dataEncoder := gob.NewEncoder(dataFile)
 
-	stored.mu.Lock()
-	defer stored.mu.Unlock()
 	dataEncoder.Encode(stored.m)
 
 	dataFile.Close()
@@ -48,8 +46,6 @@ func (stored *Storage) readFile(filename string) {
 
 	dataDecoder := gob.NewDecoder(dataFile)
 
-	stored.mu.Lock()
-	defer stored.mu.Unlock()
 	err = dataDecoder.Decode(&stored.m)
 
 	if err != nil {
@@ -61,9 +57,10 @@ func (stored *Storage) readFile(filename string) {
 }
 
 func (stored *Storage) Get(key string, filename string) ([]byte, bool) {
+
+	stored.mu.RLock()
+	defer stored.mu.RUnlock()
 	stored.readFile(filename)
-	stored.mu.Lock()
-	defer stored.mu.Unlock()
 	value, check := stored.m[key]
 	return value, check
 }
@@ -76,7 +73,13 @@ func (stored *Storage) Set(key string, value []byte, filename string) {
 }
 
 func (stored *Storage) HasData(filename string) bool {
-	stored.mu.Lock()
-	defer stored.mu.Unlock()
-	return len(stored.m) > 0
+
+	stored.mu.RLock()
+	defer stored.mu.RUnlock()
+
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }

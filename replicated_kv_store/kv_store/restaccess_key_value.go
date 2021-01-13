@@ -2,7 +2,6 @@ package kv_store
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 
@@ -42,8 +41,6 @@ func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 //handles all post requests
 func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 
-	log.Printf("\nPOST request received\n")
-
 	// if r.Method != "POST" {
 	// 	http.Error(w, "Method is not supported.", http.StatusNotFound)
 	// 	return
@@ -75,8 +72,6 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 //handles all get requests
 func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 
-	log.Printf("\nGET request received\n")
-
 	// if r.Method != "GET" {
 	// 	http.Error(w, "Method is not supported.", http.StatusNotFound)
 	// 	return
@@ -99,8 +94,6 @@ func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 //handles all put requests
 func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
-
-	log.Printf("\nPUT request received\n")
 
 	// if r.Method != "PUT" {
 	// 	http.Error(w, "Method is not supported.", http.StatusNotFound)
@@ -131,8 +124,6 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 //handles all delete requests
 func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
-
-	log.Printf("\nDELETE request received\n")
 
 	// if r.Method != "DELETE" {
 	// 	http.Error(w, "Method is not supported.", http.StatusNotFound)

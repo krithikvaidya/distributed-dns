@@ -136,8 +136,11 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		// at this point, logIndex has either reached the end of the log (or the first conflicting entry), and/or entryIndex has reached the end
 		// of the message's entries. if entryIndex has reached the end, it means that there is nothing new to add to the candidate's log.
+		flag := false
+
 		for ; entryIndex < len(in.Entries); entryIndex++ {
 
+			flag = true
 			if logIndex == len(node.log) {
 
 				// add new entry to log
@@ -154,6 +157,10 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			logIndex++
 
+		}
+
+		if flag {
+			node.persistToStorage()
 		}
 
 		//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
@@ -179,7 +186,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		} else {
-			node.persistToStorage()
 			node.raft_node_mutex.Unlock()
 		}
 
@@ -187,7 +193,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
-		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil

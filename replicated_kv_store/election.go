@@ -25,6 +25,7 @@ func (node *RaftNode) RunElectionTimer() {
 		// if node was already candidate, restart election
 
 		node.raft_node_mutex.Lock()
+
 		node.ToCandidate()
 
 		// log.Printf("\nUnlocked in AppendEntries\n")

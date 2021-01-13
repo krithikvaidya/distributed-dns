@@ -14,9 +14,8 @@ func (node *RaftNode) ToFollower(term int32) {
 	node.currentTerm = term
 	node.votedFor = -1
 
-	node.raft_node_mutex.Lock()
 	node.persistToStorage()
-	node.raft_node_mutex.Unlock()
+
 	// If node was a leader or candidate, start election timer. Else if it was a follower, reset the election timer.
 
 	if prevState == Leader || prevState == Candidate {
@@ -37,9 +36,7 @@ func (node *RaftNode) ToCandidate() {
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.replica_id
-	node.raft_node_mutex.Lock()
 	node.persistToStorage()
-	node.raft_node_mutex.Unlock()
 	//we can start an election for the candidate to become the leader
 	node.StartElection()
 }
@@ -107,6 +104,7 @@ func (node *RaftNode) ToLeader() {
 
 	node.raft_node_mutex.Lock()
 	node.commitIndex++
+	node.persistToStorage()
 	node.raft_node_mutex.Unlock()
 	node.commits_ready <- 1
 

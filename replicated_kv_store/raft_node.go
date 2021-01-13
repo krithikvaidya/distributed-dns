@@ -89,12 +89,10 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 	}
 
 	if rn.storage.HasData(rn.fileStored) {
-		fmt.Println("Oh no")
 		rn.restoreFromStorage(rn.storage)
-	} else {
-		fmt.Println("Here")
 	}
 
+	log.Printf("\ncurrent currentTerm: %v\ncurrent votedFor: %v\n current log: %v\ncurrent LogLen: %v\n", rn.currentTerm, rn.votedFor, rn.log, len(rn.log))
 	return rn
 
 }
@@ -162,6 +160,7 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 }
 
 func (node *RaftNode) persistToStorage() {
+
 	var termvalue bytes.Buffer
 	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
 	node.storage.Set("currentTerm", termvalue.Bytes(), node.fileStored)
@@ -173,6 +172,7 @@ func (node *RaftNode) persistToStorage() {
 	var logentries bytes.Buffer
 	gob.NewEncoder(&logentries).Encode(node.log)
 	node.storage.Set("log", logentries.Bytes(), node.fileStored)
+
 }
 
 // Apply committed entries to our key-value store.
@@ -272,7 +272,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 		}
 
 		node.lastApplied = node.lastApplied + to_commit
-		node.commits_applied_to_kv <- true
 		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
 		node.raft_node_mutex.Unlock()
 	}

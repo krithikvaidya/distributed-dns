@@ -98,18 +98,19 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			//log.Printf("Lock on %d", replica_id)
 
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
+
 				tot_success := atomic.AddInt32(&successes, 1)
 
 				if tot_success == (node.n_replicas)/2+1 { // write quorum achieved
-					log.Printf("%d return success\n", replica_id)
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
 				}
 
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
+				log.Printf("Sending AE FAILED for replica %v\n", replica_id)
+
 				if tot_fail == (node.n_replicas+1)/2 {
-					log.Printf("%d return fail\n", replica_id)
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
@@ -129,7 +130,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(30 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
