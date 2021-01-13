@@ -57,8 +57,8 @@ type RaftNode struct {
 	nextIndex  []int32 // Indices of the next log entry to send to each server
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 
-	storage    Storage // Used for Persistence
-	fileStored string  //Name of file where things are stored
+	storage    *Storage // Used for Persistence
+	fileStored string   //Name of file where things are stored
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
@@ -68,22 +68,13 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		n_replicas:            n_replica,
 		ready_chan:            make(chan bool),
 		replicas_ready:        0,
-		replica_id:            rid,
-		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
-		state:                 Follower, // all nodes are initialized as followers
-		electionTimerRunning:  false,
-		kvstore_addr:          keyvalue_port,
-		commits_ready:         make(chan int32),
-		commits_applied_to_kv: make(chan bool),
-		n_replicas:            n_replica,
-		ready_chan:            make(chan bool),
-		replicas_ready:        0,
 		replica_id:            int32(rid),
 		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
 		state:                 Follower, // all nodes are initialized as followers
 		electionTimerRunning:  false,
 		kvstore_addr:          keyvalue_port,
 		commits_ready:         make(chan int32),
+		commits_applied_to_kv: make(chan bool),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -98,7 +89,10 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 	}
 
 	if rn.storage.HasData(rn.fileStored) {
+		fmt.Println("Oh no")
 		rn.restoreFromStorage(rn.storage)
+	} else {
+		fmt.Println("Here")
 	}
 
 	return rn
@@ -146,7 +140,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	node.raft_node_mutex.Unlock()
 }
 
-func (node *RaftNode) restoreFromStorage(storage Storage) {
+func (node *RaftNode) restoreFromStorage(storage *Storage) {
 	if termvalue, check := node.storage.Get("currentTerm", node.fileStored); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
 		temp.Decode(&node.currentTerm)

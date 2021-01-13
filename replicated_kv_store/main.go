@@ -77,7 +77,7 @@ func init() {
 
 func main() {
 
-	log.Println("\nRaft-based Replicated Key Value Store\n")
+	log.Println("\nRaft-based Replicated Key Value Store")
 
 	log.Printf("Enter the replica's id: ")
 	var rid int

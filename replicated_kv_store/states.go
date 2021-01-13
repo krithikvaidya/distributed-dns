@@ -13,10 +13,12 @@ func (node *RaftNode) ToFollower(term int32) {
 	node.state = Follower
 	node.currentTerm = term
 	node.votedFor = -1
+
 	node.raft_node_mutex.Lock()
 	node.persistToStorage()
 	node.raft_node_mutex.Unlock()
-	// If node was a leader or candidate, start election timer. Else if it was a candidate, reset the election timer.
+	// If node was a leader or candidate, start election timer. Else if it was a follower, reset the election timer.
+
 	if prevState == Leader || prevState == Candidate {
 		node.electionTimerRunning = true
 		go node.RunElectionTimer()
