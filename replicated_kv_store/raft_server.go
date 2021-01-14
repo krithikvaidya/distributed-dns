@@ -20,6 +20,9 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
 		return
@@ -54,6 +57,9 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nGET request received\n")
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
 	// TODO: Make sure all committed entries are applied before responding to it.
 
 	node.raft_node_mutex.RLock()
@@ -83,6 +89,9 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nPUT request received\n")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
 
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
@@ -118,6 +127,9 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nDELETE request received\n")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
 	node.raft_node_mutex.Lock()
 

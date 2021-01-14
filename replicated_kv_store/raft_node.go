@@ -29,16 +29,16 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	ready_chan            chan bool                       // Channel to signal whether the node is ready for operation
-	n_replicas            int32                           // The number of replicas in the current replicated system
-	replicas_ready        int32                           // number of replicas that have connected to this replica's gRPC server.
-	replica_id            int32                           // The unique ID for the current replica
-	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex       sync.RWMutex                    // The mutex for working with the RaftNode struct
-	electionTimerRunning  bool                            // will be true if the node is a follower and the election timer is running
-	kvstore_addr          string                          // stores respective port on which local key value store is running
-	commits_ready         chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
-	commits_applied_to_kv chan bool                       // Channel to indicate completion of changes applied to key value store
+	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
+	n_replicas           int32                           // The number of replicas in the current replicated system
+	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
+	replica_id           int32                           // The unique ID for the current replica
+	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
+	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
+	electionTimerRunning bool                            // will be true if the node is a follower and the election timer is running
+	kvstore_addr         string                          // stores respective port on which local key value store is running
+	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
+
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
@@ -65,25 +65,24 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 	rn := &RaftNode{
 
-		n_replicas:            n_replica,
-		ready_chan:            make(chan bool),
-		replicas_ready:        0,
-		replica_id:            rid,
-		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
-		state:                 Follower, // all nodes are initialized as followers
-		electionTimerRunning:  false,
-		kvstore_addr:          keyvalue_port,
-		commits_ready:         make(chan int32),
-		commits_applied_to_kv: make(chan bool),
-		n_replicas:            n_replica,
-		ready_chan:            make(chan bool),
-		replicas_ready:        0,
-		replica_id:            int32(rid),
-		peer_replica_clients:  make([]protos.ConsensusServiceClient, n_replica),
-		state:                 Follower, // all nodes are initialized as followers
-		electionTimerRunning:  false,
-		kvstore_addr:          keyvalue_port,
-		commits_ready:         make(chan int32),
+		n_replicas:           n_replica,
+		ready_chan:           make(chan bool),
+		replicas_ready:       0,
+		replica_id:           rid,
+		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
+		state:                Follower, // all nodes are initialized as followers
+		electionTimerRunning: false,
+		kvstore_addr:         keyvalue_port,
+		commits_ready:        make(chan int32),
+		n_replicas:           n_replica,
+		ready_chan:           make(chan bool),
+		replicas_ready:       0,
+		replica_id:           int32(rid),
+		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
+		state:                Follower, // all nodes are initialized as followers
+		electionTimerRunning: false,
+		kvstore_addr:         keyvalue_port,
+		commits_ready:        make(chan int32),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -278,7 +277,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 		}
 
 		node.lastApplied = node.lastApplied + to_commit
-		node.commits_applied_to_kv <- true
 		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
 		node.raft_node_mutex.Unlock()
 	}
