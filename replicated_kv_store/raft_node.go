@@ -57,8 +57,8 @@ type RaftNode struct {
 	nextIndex  []int32 // Indices of the next log entry to send to each server
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 
-	storage    Storage // Used for Persistence
-	fileStored string  //Name of file where things are stored
+	storage    *Storage // Used for Persistence
+	fileStored string   //Name of file where things are stored
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
@@ -100,6 +100,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		rn.restoreFromStorage(rn.storage)
 	}
 
+	log.Printf("\ncurrent currentTerm: %v\ncurrent votedFor: %v\n current log: %v\ncurrent LogLen: %v\n", rn.currentTerm, rn.votedFor, rn.log, len(rn.log))
 	return rn
 
 }
@@ -145,7 +146,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	node.raft_node_mutex.Unlock()
 }
 
-func (node *RaftNode) restoreFromStorage(storage Storage) {
+func (node *RaftNode) restoreFromStorage(storage *Storage) {
 	if termvalue, check := node.storage.Get("currentTerm", node.fileStored); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
 		temp.Decode(&node.currentTerm)
@@ -167,6 +168,7 @@ func (node *RaftNode) restoreFromStorage(storage Storage) {
 }
 
 func (node *RaftNode) persistToStorage() {
+
 	var termvalue bytes.Buffer
 	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
 	node.storage.Set("currentTerm", termvalue.Bytes(), node.fileStored)
@@ -178,6 +180,7 @@ func (node *RaftNode) persistToStorage() {
 	var logentries bytes.Buffer
 	gob.NewEncoder(&logentries).Encode(node.log)
 	node.storage.Set("log", logentries.Bytes(), node.fileStored)
+
 }
 
 // Apply committed entries to our key-value store.

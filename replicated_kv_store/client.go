@@ -57,6 +57,10 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 				return success
 			}
 
+		if success {
+			node.raft_node_mutex.Lock()
+			node.commitIndex++
+			node.persistToStorage()
 			node.raft_node_mutex.Unlock()
 			return false
 		}

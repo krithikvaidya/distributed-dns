@@ -14,7 +14,7 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
+	duration := time.Duration(150+rand.Intn(300)) * time.Millisecond
 
 	select {
 
@@ -25,6 +25,7 @@ func (node *RaftNode) RunElectionTimer() {
 		// if node was already candidate, restart election
 
 		node.raft_node_mutex.Lock()
+
 		node.ToCandidate()
 
 		// log.Printf("\nUnlocked in AppendEntries\n")
@@ -36,6 +37,7 @@ func (node *RaftNode) RunElectionTimer() {
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
+		//log.Println("\nReset Timer")
 		go node.RunElectionTimer()
 		return
 
