@@ -11,48 +11,54 @@ import (
 )
 
 //WriteCommand is called when the client sends the replica a write request.
-func (node *RaftNode) WriteCommand(operation []string) bool {
+func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 
 	// Perform operation only if leader
-	if node.state == Leader {
+	if oper, val := node.trackMessage[client]; val && oper != operation[len(operation)-1] {
 
-		//append to local log
-		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+		if node.state == Leader {
 
-		// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
+			//append to local log
+			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
 
-		var entries []*protos.LogEntry
-		entries = append(entries, &node.log[len(node.log)-1])
+			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
-		msg := &protos.AppendEntriesMessage{
+			var entries []*protos.LogEntry
+			entries = append(entries, &node.log[len(node.log)-1])
 
-			Term:         node.currentTerm,
-			LeaderId:     node.replica_id,
-			PrevLogIndex: int32(len(node.log) - 1),
-			PrevLogTerm:  node.log[len(node.log)-1].Term,
-			LeaderCommit: node.commitIndex,
-			Entries:      entries,
+			msg := &protos.AppendEntriesMessage{
+
+				Term:         node.currentTerm,
+				LeaderId:     node.replica_id,
+				PrevLogIndex: int32(len(node.log) - 1),
+				PrevLogTerm:  node.log[len(node.log)-1].Term,
+				LeaderCommit: node.commitIndex,
+				Entries:      entries,
+				Client:       client,
+			}
+
+			successful_write := make(chan bool)
+
+			node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
+
+			node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+
+			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
+
+			if success {
+				node.raft_node_mutex.Lock()
+				node.commitIndex++
+				node.raft_node_mutex.Unlock()
+				node.commits_ready <- 1
+				log.Printf("\nWrite operation successfully completed and committed.\n")
+			} else {
+				log.Printf("\nWrite operation failed.\n")
+			}
+			node.trackMessage[client] = operation[len(operation)-1]
+			return success
 		}
-
-		successful_write := make(chan bool)
-
-		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
-
-		node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
-
-		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
-
-		if success {
-			node.raft_node_mutex.Lock()
-			node.commitIndex++
-			node.raft_node_mutex.Unlock()
-			node.commits_ready <- 1
-			log.Printf("\nWrite operation successfully completed and committed.\n")
-		} else {
-			log.Printf("\nWrite operation failed.\n")
-		}
-
-		return success
+	} else {
+		return true
 	}
 
 	node.raft_node_mutex.Unlock()

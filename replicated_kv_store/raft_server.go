@@ -29,6 +29,7 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+		fmt.Fprintf(w, "\nserverAddress: "+node.leader_address+"\n")
 		node.raft_node_mutex.Unlock()
 		return
 	}
@@ -36,13 +37,14 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	value := r.FormValue("value")
 	params := mux.Vars(r)
 	key := params["key"]
+	client := params["client"]
 
 	operation := make([]string, 3)
 	operation[0] = "POST"
 	operation[1] = key
 	operation[2] = value
 
-	if node.WriteCommand(operation) { // Mutex will be unlocked in WriteCommand
+	if node.WriteCommand(operation, client) { // Mutex will be unlocked in WriteCommand
 		fmt.Fprintf(w, "\nSuccessful POST\n")
 	} else {
 		fmt.Fprintf(w, "\nPOST request failed to be completed.\n")
@@ -60,6 +62,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+		fmt.Fprintf(w, "\nserverAddress: "+node.leader_address+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -93,6 +96,7 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+		fmt.Fprintf(w, "\nserverAddress: "+node.leader_address+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -100,13 +104,14 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 	value := r.FormValue("value")
 	params := mux.Vars(r)
 	key := params["key"]
+	client := params["client"]
 
 	operation := make([]string, 3)
 	operation[0] = "PUT"
 	operation[1] = key
 	operation[2] = value
 
-	if node.WriteCommand(operation) {
+	if node.WriteCommand(operation, client) {
 		fmt.Fprintf(w, "\nPUT success.\n")
 	} else {
 		fmt.Fprintf(w, "\nPUT failed.\n")
@@ -123,18 +128,20 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+		fmt.Fprintf(w, "\nserverAddress: "+node.leader_address+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
 
 	params := mux.Vars(r)
 	key := params["key"]
+	client := params["client"]
 
 	operation := make([]string, 2)
 	operation[0] = "DELETE"
 	operation[1] = key
 
-	if node.WriteCommand(operation) {
+	if node.WriteCommand(operation, client) {
 		fmt.Fprintf(w, "\nDELETE success.\n")
 	} else {
 		fmt.Fprintf(w, "\nDELETE failed.\n")

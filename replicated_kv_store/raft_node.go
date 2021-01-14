@@ -38,13 +38,14 @@ type RaftNode struct {
 	kvstore_addr         string                          // stores respective port on which local key value store is running
 	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
 
+	trackMessage map[string]string
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int32             // Latest term server has seen
-	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
-	log         []protos.LogEntry // The array of the log entry structs
-
+	currentTerm    int32             // Latest term server has seen
+	votedFor       int32             // Candidate ID of the node that received vote from current node in the latest term
+	log            []protos.LogEntry // The array of the log entry structs
+	leader_address string
 	// State to be maintained on all replicas (unpersisted)
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
@@ -70,6 +71,8 @@ func InitializeNode(n_replica int32, rid int32, keyvalue_port string) *RaftNode 
 		electionTimerRunning: false,
 		kvstore_addr:         keyvalue_port,
 		commits_ready:        make(chan int32),
+
+		trackMessage: make(map[string]string),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,

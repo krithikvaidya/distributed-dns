@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"google.golang.org/grpc/peer"
 )
 
 // To send AppendEntry to single replica, and retry if needed (called by LeaderSendAEs defined below).
@@ -15,7 +16,8 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	response, err = client_obj.AppendEntries(context.Background(), msg)
+	var ctx context.Context
+	response, err = client_obj.AppendEntries(peer.NewContext(ctx, &peer.Peer{}), msg)
 
 	if err != nil {
 		return false
@@ -58,6 +60,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
+			Client:       msg.Client,
 		}
 
 		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)

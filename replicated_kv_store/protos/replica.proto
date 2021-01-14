@@ -45,7 +45,9 @@ message AppendEntriesMessage {
     int32 leaderCommit = 5;
 
     repeated LogEntry entries = 6;
+    string serial = "kdmamd2";
 
+    string client = "hash";
 }
 
 message AppendEntriesResponse {

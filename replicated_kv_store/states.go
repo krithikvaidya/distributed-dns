@@ -90,6 +90,7 @@ func (node *RaftNode) ToLeader() {
 		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
+		Client:       "",
 	}
 
 	node.raft_node_mutex.Unlock()
