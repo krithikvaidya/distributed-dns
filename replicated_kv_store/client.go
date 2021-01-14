@@ -113,6 +113,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 			return "unable to perform read", errors.New("read_failed")
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
