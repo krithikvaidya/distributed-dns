@@ -44,7 +44,6 @@ func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 			node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
 
 			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
-
 			if success {
 				node.raft_node_mutex.Lock()
 				node.commitIndex++

@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -79,25 +80,11 @@ func main() {
 	log.Println("\nRaft-based Replicated Key Value Store\n")
 
 	log.Printf("Enter the replica's id: ")
-	var rid int32
+	var rid int
 	fmt.Scanf("%d", &rid)
 
-	log.Printf("\nEnter the TCP network address that the replica should bind to (eg - :7890): ")
-	var address string
-	fmt.Scanf("%s", &address)
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", address)
-	CheckErrorFatal(err)
-
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	CheckErrorFatal(err)
-
-	log.Printf("\nSuccessfully listening at address %v\n", address)
-
 	// Start the local key value store and wait for it to initialize
-	var addresskeyvalue string
-	log.Printf("\nEnter the port the key-value replica should listen on: ")
-	fmt.Scanf("%s", &addresskeyvalue)
+	addresskeyvalue := ":300" + strconv.Itoa(rid) // kv-store will run at port :3000, :3001, ...
 
 	go StartKVStore(addresskeyvalue)
 
@@ -118,27 +105,21 @@ func main() {
 
 	}
 
-	// Get the address to bind the server that listens to client requests.
-	log.Printf("\nEnter the port the replica should listen for client requests on: ")
-	var server_address string
-	fmt.Scanf("%s", &server_address)
+	server_address := ":400" + strconv.Itoa(rid) // server for listening to client requests will run on port :4000, :4001, ....
 	// Starting the server is done after InitializeNode
 
-	log.Printf("\nEnter the addresses of %v other replicas: \n", n_replica-1)
-
+	// Store the gRPC address of other replicas
 	rep_addrs := make([]string, n_replica)
 
-	for i := int32(0); i < int32(n_replica); i++ {
+	for i := 0; i < n_replica; i++ {
 
 		if i == rid {
 			continue
 		}
 
-		fmt.Scanf("%s", &rep_addrs[i])
+		rep_addrs[i] = ":500" + strconv.Itoa(i)
 
 	}
-
-	grpcServer := grpc.NewServer()
 
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
@@ -164,6 +145,16 @@ func main() {
 
 	}
 
+	grpc_address := ":500" + strconv.Itoa(rid) // gRPC server will run at port :2000, :2001, ...
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", grpc_address)
+	CheckErrorFatal(err)
+
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	CheckErrorFatal(err)
+
+	grpcServer := grpc.NewServer()
+
 	// ConsensusService is defined in protos/replica.proto./
 	// RegisterConsensusServiceServer is present in the generated .pb.go file
 	protos.RegisterConsensusServiceServer(grpcServer, node)
@@ -176,7 +167,7 @@ func main() {
 
 	}()
 
-	log.Printf("\ngRPC server listening...\n")
+	log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
 
 	log.Printf("\nPress enter when all other nodes are online.\n")
 	var input rune

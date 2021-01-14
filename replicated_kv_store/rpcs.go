@@ -77,14 +77,14 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		node.votedFor = in.CandidateId
 
 		log.Printf("\nGranting vote\n")
-
+		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
 
 	} else {
 
 		log.Printf("\nRejecting vote\n")
-
+		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
 
@@ -98,13 +98,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	// term received is lesser than current term
 	if node.currentTerm > in.Term {
-
 		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
 
-		// current term is lesser than received term, we transition into being a candidate and reset timer and update term
+		// current term is lesser than received term, we transition into being a follower and reset timer and update term
 		node.ToFollower(in.Term)
 
 	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {
@@ -138,8 +137,11 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		// at this point, logIndex has either reached the end of the log (or the first conflicting entry), and/or entryIndex has reached the end
 		// of the message's entries. if entryIndex has reached the end, it means that there is nothing new to add to the candidate's log.
+		flag := false
+
 		for ; entryIndex < len(in.Entries); entryIndex++ {
 
+			flag = true
 			if logIndex == len(node.log) {
 
 				// add new entry to log
@@ -158,6 +160,10 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		}
 
+		if flag {
+			node.persistToStorage()
+		}
+
 		//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 		if in.LeaderCommit > node.commitIndex {
 
@@ -174,6 +180,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
+			node.persistToStorage()
 
 			node.raft_node_mutex.Unlock()
 

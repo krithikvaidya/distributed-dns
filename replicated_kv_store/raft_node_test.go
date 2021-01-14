@@ -23,7 +23,7 @@ func TestInitializeNode(t *testing.T) {
 	no_of_replicas = 5
 	replica_id = 1
 	replica_key_value_port = ":8081"
-	node := InitializeNode(no_of_replicas, replica_id, replica_key_value_port)
+	node := InitializeNode(no_of_replicas, int(replica_id), replica_key_value_port)
 
 	// Here, we check every member of the RaftNode struct
 
@@ -94,12 +94,12 @@ func TestInitializeNode(t *testing.T) {
 	}
 
 	// Check the value of `commitIndex`
-	if node.commitIndex != 0 {
+	if node.commitIndex != -1 {
 		t.Errorf("Invalid value %v for commitIndex, expected 0", node.commitIndex)
 	}
 
 	// Check the value of `lastApplied`
-	if node.lastApplied != 0 {
+	if node.lastApplied != -1 {
 		t.Errorf("Invalid value %v for lastApplied, expected 0", node.lastApplied)
 	}
 
