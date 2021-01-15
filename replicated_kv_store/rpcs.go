@@ -189,11 +189,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			node.raft_node_mutex.Unlock()
 		}
 
-		type contextKey string
-		CAdd := contextKey("Address")
-		if val := ctx.Value(CAdd); val != nil {
-			node.leaderAddress = val.(string)
-		} // gets the leaders address
+		node.leaderAddress = in.LeaderAddr // gets the leaders address
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 

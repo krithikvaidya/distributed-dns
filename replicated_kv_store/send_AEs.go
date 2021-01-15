@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync/atomic"
 	"time"
@@ -18,10 +17,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 
 	//log.Printf("IN %d\n", replica_id)
 	// Call the AppendEntries RPC for the given client\
-	type contextKey string
-	CAdd := contextKey("Address")
-	response, err = client_obj.AppendEntries(context.WithValue(context.Background(), CAdd, node.nodeAddress), msg)
-	fmt.Println("tf")
+	response, err = client_obj.AppendEntries(context.Background(), msg)
 	if err != nil {
 		return false
 	}
@@ -63,6 +59,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
+			LeaderAddr:   node.nodeAddress,
 		}
 
 		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
@@ -168,6 +165,7 @@ func (node *RaftNode) HeartBeats() {
 			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
+			LeaderAddr:   node.nodeAddress,
 		}
 
 		node.raft_node_mutex.RUnlock()

@@ -93,6 +93,7 @@ func (node *RaftNode) ToLeader() {
 		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
+		LeaderAddr:   node.nodeAddress,
 	}
 
 	node.persistToStorage()

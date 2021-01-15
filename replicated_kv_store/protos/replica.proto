@@ -31,7 +31,7 @@ message LogEntry {
 
     int32 term = 1;
     repeated string operation = 2;  // [POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
-    string clientid = 1; //track which client made this entry
+    string clientid = 3; //track which client made this entry
 }
 
 message AppendEntriesMessage {
@@ -45,7 +45,7 @@ message AppendEntriesMessage {
     int32 leaderCommit = 5;
 
     repeated LogEntry entries = 6;
-    string serial = 1;
+    string leaderAddr = 7;
 }
 
 message AppendEntriesResponse {
