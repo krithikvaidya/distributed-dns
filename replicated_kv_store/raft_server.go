@@ -28,11 +28,11 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.Lock()
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		node.raft_node_mutex.Unlock()
+		node.raft_node_mutex.RUnlock()
 		return
 	}
 
@@ -98,7 +98,7 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.Lock()
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
@@ -131,7 +131,7 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	node.raft_node_mutex.Lock()
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")

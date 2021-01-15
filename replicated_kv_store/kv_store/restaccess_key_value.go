@@ -44,10 +44,10 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
 
-	if r.Method != "POST" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
+	// if r.Method != "POST" {
+	// http.Error(w, "Method is not supported.", http.StatusNotFound)
+	// return
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -80,10 +80,10 @@ func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nGET request received\n")
 
-	if r.Method != "GET" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
+	// if r.Method != "GET" {
+	// http.Error(w, "Method is not supported.", http.StatusNotFound)
+	// return
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -108,10 +108,10 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPUT request received\n")
 
-	if r.Method != "PUT" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
+	// if r.Method != "PUT" {
+	// http.Error(w, "Method is not supported.", http.StatusNotFound)
+	// return
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -143,10 +143,10 @@ func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nDELETE request received\n")
 
-	if r.Method != "DELETE" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
+	// if r.Method != "DELETE" {
+	// http.Error(w, "Method is not supported.", http.StatusNotFound)
+	// return
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
