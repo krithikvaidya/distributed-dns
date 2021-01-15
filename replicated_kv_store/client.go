@@ -14,12 +14,24 @@ import (
 func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 
 	// Perform operation only if leader
-	if oper, val := node.trackMessage[client]; val && oper != operation[len(operation)-1] {
+	i := 0
+	oper, val := node.trackMessage[client]
+	if val { //check if entry exists; if it does check if its the same as the one that was previously
+		for i < 3 {
+			if oper[i] == operation[i] {
+				i++
+			} else {
+				break
+			}
+
+		}
+	}
+	if i != 3 || !val { //if entry isnt the same or entry doesnt exist
 
 		if node.state == Leader {
 
 			//append to local log
-			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
 
 			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
@@ -34,7 +46,6 @@ func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 				PrevLogTerm:  node.log[len(node.log)-1].Term,
 				LeaderCommit: node.commitIndex,
 				Entries:      entries,
-				Client:       client,
 			}
 
 			successful_write := make(chan bool)
@@ -53,7 +64,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 			} else {
 				log.Printf("\nWrite operation failed.\n")
 			}
-			node.trackMessage[client] = operation[len(operation)-1]
+			node.trackMessage[client] = operation
 			return success
 		}
 	} else {

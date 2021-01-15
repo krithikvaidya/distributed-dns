@@ -162,6 +162,7 @@ type LogEntry struct {
 
 	Term      int32    `protobuf:"varint,1,opt,name=term,proto3" json:"term,omitempty"`
 	Operation []string `protobuf:"bytes,2,rep,name=operation,proto3" json:"operation,omitempty"` // [POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
+	Clientid  string   `protobuf:"bytes,1,rep,name=clientid,proto3" json:"clientid,omitempty"`
 }
 
 func (x *LogEntry) Reset() {

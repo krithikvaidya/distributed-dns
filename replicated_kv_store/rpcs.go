@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
-	"google.golang.org/grpc/peer"
 )
 
 // RPC declared in protos/replica.proto.
@@ -155,7 +154,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
-
+			node.trackMessage[node.log[logIndex].Clientid] = node.log[logIndex].Operation //Updates the trackMessages for each client to the latest operation
 			logIndex++
 
 		}
@@ -189,9 +188,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 		} else {
 			node.raft_node_mutex.Unlock()
 		}
-		p, _ := peer.FromContext(ctx)
-		node.leader_address = p.Addr.String()
-		node.trackMessage[in.client] = node.log[int(node.commitIndex)].String()
+
+		type contextKey string
+		CAdd := contextKey("Address")
+		if val := ctx.Value(CAdd); val != nil {
+			node.leaderAddress = val.(string)
+		} // gets the leaders address
+
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
