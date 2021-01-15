@@ -68,15 +68,6 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		n_replicas:           n_replica,
 		ready_chan:           make(chan bool),
 		replicas_ready:       0,
-		replica_id:           rid,
-		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		state:                Follower, // all nodes are initialized as followers
-		electionTimerRunning: false,
-		kvstore_addr:         keyvalue_port,
-		commits_ready:        make(chan int32),
-		n_replicas:           n_replica,
-		ready_chan:           make(chan bool),
-		replicas_ready:       0,
 		replica_id:           int32(rid),
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
 		state:                Follower, // all nodes are initialized as followers
