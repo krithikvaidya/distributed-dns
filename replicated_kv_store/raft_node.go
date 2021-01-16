@@ -126,12 +126,29 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	node.raft_node_mutex.Lock()
 
-	go node.RunElectionTimer() // RunElectionTimer defined in election.go
+	if node.state == Follower {
+		go node.RunElectionTimer() // RunElectionTimer defined in election.go
+		node.electionTimerRunning = true
 
-	node.electionTimerRunning = true
-	node.peer_replica_clients = client_objs
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+	}
 
-	node.raft_node_mutex.Unlock()
+	//If candidate let it continue election some leader will make it back to follower and then
+	//timer also will be called from election function
+	if node.state == Candidate {
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+
+		node.StartElection()
+	}
+
+	// if node was a leader before then don't call election timer now
+	// append entries of current leader will automatically convert it back to follower and call
+	if node.state == Leader {
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+	}
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {

@@ -131,7 +131,7 @@ func (node *RaftNode) StartElection() {
 		replica_id++
 
 	}
-
+	//**NOTE** this will mostly have to be changed
 	node.electionTimerRunning = false // will be true only when in follower state and election timer is running
 	go node.RunElectionTimer()        // begin the timer during which this candidate waits for votes
 }
