@@ -51,6 +51,7 @@ func (node *RaftNode) WriteCommand(operation []string) bool {
 		if success {
 			node.raft_node_mutex.Lock()
 			node.commitIndex++
+			node.persistToStorage()
 			node.raft_node_mutex.Unlock()
 			node.commits_ready <- 1
 			log.Printf("\nWrite operation successfully completed and committed.\n")
