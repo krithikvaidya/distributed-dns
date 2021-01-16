@@ -57,10 +57,6 @@ func (node *RaftNode) StartElection() {
 			continue
 		}
 
-		if client_obj == nil {
-			continue
-		}
-
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32) {
 
 			node.raft_node_mutex.RLock()
