@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"reflect"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -14,19 +15,12 @@ import (
 func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 
 	// Perform operation only if leader
-	i := 0
-	oper, val := node.trackMessage[client]
-	if val { //check if entry exists; if it does check if its the same as the one that was previously
-		for i < 3 {
-			if oper[i] == operation[i] {
-				i++
-			} else {
-				break
-			}
-
-		}
+	var equal bool
+	lastClientOper, val := node.trackMessage[client] //lastClientOper is the operation done by the previous client
+	if val {                                         //check if entry exists; if it does check if its the same as the one that was previously
+		equal = reflect.DeepEqual(lastClientOper, operation)
 	}
-	if i != 3 || !val { //if entry isnt the same or entry doesnt exist
+	if !equal || !val { //if entry isnt the same or entry doesnt exist
 
 		if node.state == Leader {
 
@@ -68,7 +62,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 			return success
 		}
 	} else {
-		return true
+		return false
 	}
 
 	node.raft_node_mutex.Unlock()

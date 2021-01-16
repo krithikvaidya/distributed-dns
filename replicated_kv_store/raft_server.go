@@ -35,9 +35,10 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	value := r.FormValue("value")
+	client := r.FormValue("client")
 	params := mux.Vars(r)
 	key := params["key"]
-	client := params["client"]
+	fmt.Println(client + "\n")
 
 	operation := make([]string, 3)
 	operation[0] = "POST"
@@ -102,9 +103,9 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	value := r.FormValue("value")
+	client := r.FormValue("client")
 	params := mux.Vars(r)
 	key := params["key"]
-	client := params["client"]
 
 	operation := make([]string, 3)
 	operation[0] = "PUT"
@@ -124,6 +125,11 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nDELETE request received\n")
 
+	if err := r.ParseForm(); err != nil {
+		fmt.Fprintf(w, "ParseForm() err: %v", err)
+		return
+	}
+
 	node.raft_node_mutex.Lock()
 
 	if node.state != Leader {
@@ -135,7 +141,7 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	params := mux.Vars(r)
 	key := params["key"]
-	client := params["client"]
+	client := r.FormValue("client")
 
 	operation := make([]string, 2)
 	operation[0] = "DELETE"
