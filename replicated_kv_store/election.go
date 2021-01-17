@@ -14,21 +14,40 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(5000+rand.Intn(10000)) * time.Millisecond
+	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 
 	select {
 
 	case <-time.After(duration): // for timeout to call election
 
+		log.Printf("\nTrying to get lock in election timeout\n")
+		node.raft_node_mutex.Lock()
+		log.Printf("\nGot lock in election timeout\n")
+
+		// by the time the lock was acquired, if the electionResetEvent or the stopElectionTimer channels
+		// are written to, don't transition to candidate.
+		select {
+
+		case <-node.stopElectiontimer: //to stop timer
+			node.raft_node_mutex.Unlock()
+			return
+
+		case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
+
+			node.raft_node_mutex.Unlock()
+			go node.RunElectionTimer()
+			return
+
+		default:
+			break // break out of select block
+		}
+
 		log.Printf("\nElection timer runs out.\n")
+
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 
-		node.raft_node_mutex.Lock()
-
 		node.ToCandidate()
-
-		// log.Printf("\nUnlocked in AppendEntries\n")
 
 		node.raft_node_mutex.Unlock()
 		return
@@ -37,7 +56,6 @@ func (node *RaftNode) RunElectionTimer() {
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
-		//log.Println("\nReset Timer")
 		go node.RunElectionTimer()
 		return
 
@@ -120,7 +138,7 @@ func (node *RaftNode) StartElection() {
 
 			} else {
 
-				log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
+				// log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
 
 			}
 
@@ -131,7 +149,6 @@ func (node *RaftNode) StartElection() {
 		replica_id++
 
 	}
-	//**NOTE** this will mostly have to be changed
-	node.electionTimerRunning = false // will be true only when in follower state and election timer is running
-	go node.RunElectionTimer()        // begin the timer during which this candidate waits for votes
+
+	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 }

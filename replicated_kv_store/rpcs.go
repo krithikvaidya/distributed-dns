@@ -45,7 +45,6 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 	// log.Printf("\nIn RequestVote. RWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
 
-	node_current_term := node.currentTerm
 	latestLogIndex := int32(-1)
 	latestLogTerm := int32(-1)
 
@@ -54,38 +53,33 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		latestLogTerm = node.log[latestLogIndex].Term
 	}
 
-	log.Printf("\nReceived term: %v, My term: %v, My votedFor: %v\n", in.Term, node_current_term, node.votedFor)
+	log.Printf("\nReceived term: %v, My term: %v, My votedFor: %v\n", in.Term, node.currentTerm, node.votedFor)
 	log.Printf("\nReceived latestLogIndex: %v, My latestLogIndex: %v, Received latestLogTerm: %v, My latestLogTerm: %v\n", in.LastLogIndex, latestLogIndex, in.LastLogTerm, latestLogTerm)
 
 	// If the received message's term is greater than the replica's current term, transition to
 	// follower (if not already a follower) and update term.
-	if in.Term > node_current_term {
+	if in.Term > node.currentTerm {
 		node.ToFollower(in.Term)
-		// log.Printf("\nAfter tofollower, my term %v\n", node.currentTerm)
 	}
 
-	// Grant vote if the received message's term is not lesser than the replica's term, and if the
-	// candidate's log is atleast as up-to-date as the replica's.
+	// If ToFollower was called above, in.Term and node.currentTerm will be equal. If in.Term < node.currentTerm, reject vote.
+	// If the candidate's log is not atleast as up-to-date as the replica's, reject vote.
 	if (node.votedFor == in.CandidateId) ||
-		((in.Term > node_current_term) && (node.votedFor == -1) &&
+		((in.Term == node.currentTerm) && (node.votedFor == -1) &&
 			(in.LastLogTerm > latestLogTerm || ((in.LastLogTerm == latestLogTerm) && (in.LastLogIndex >= latestLogIndex)))) {
 
-		if node.electionTimerRunning {
-			node.electionResetEvent <- true
-		}
 		node.votedFor = in.CandidateId
 
 		log.Printf("\nGranting vote\n")
 		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
-		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
+		return &protos.RequestVoteResponse{Term: node.currentTerm, VoteGranted: true}, nil
 
 	} else {
 
 		log.Printf("\nRejecting vote\n")
-		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
-		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
+		return &protos.RequestVoteResponse{Term: node.currentTerm, VoteGranted: false}, nil
 
 	}
 
@@ -93,11 +87,14 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
+	log.Printf("\nreceived AE!\n")
 	node.raft_node_mutex.Lock()
+	log.Printf("\nlocked in AE\n")
 
-	// term received is lesser than current term
+	// term received is lesser than current term. CHECK: we don't reset election timer here.
 	if node.currentTerm > in.Term {
 		node.raft_node_mutex.Unlock()
+		log.Printf("\nunlocked in AE\n")
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
@@ -112,10 +109,9 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	}
 
-	// here we can be sure that the node's current term and the term in the message match.
-	if node.electionTimerRunning {
-		node.electionResetEvent <- true
-	}
+	// here we can be sure that the node's current term and the term in the message match, and that the node is not a leader or a
+	// candidate.
+	node.electionResetEvent <- true
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -182,11 +178,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			}
 			node.persistToStorage()
 
+			log.Printf("\nunlocked in AE\n")
 			node.raft_node_mutex.Unlock()
 
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		} else {
+			log.Printf("\nunlocked in AE\n")
 			node.raft_node_mutex.Unlock()
 		}
 
@@ -194,6 +192,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
+		log.Printf("\nunlocked in AE\n")
 		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil

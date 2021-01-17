@@ -15,9 +15,9 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var response *protos.AppendEntriesResponse
 	var err error
 
-	//log.Printf("IN %d\n", replica_id)
 	// Call the AppendEntries RPC for the given client
-	response, err = client_obj.AppendEntries(context.Background(), msg)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
 		return false
@@ -141,7 +141,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(2000 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -181,6 +181,7 @@ func (node *RaftNode) HeartBeats() {
 		node.raft_node_mutex.RUnlock()
 
 		success := make(chan bool)
+		log.Printf("\nSENDING HEARTBEAT\n")
 		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)
 		<-success
 
