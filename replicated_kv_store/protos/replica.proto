@@ -23,13 +23,14 @@ message RequestVoteResponse {
 /*
  * This is a format for representing a single log
  * entry. Each log entry contains the value, and the
- * term number, when it was added to the leader's log.
+ * term number, when it was added to the leader's log,
+ * and an identifier for the client that made the request.
  */
 message LogEntry {
 
     int32 term = 1;
     repeated string operation = 2;  // [POST/PUT/DELETE/NO-OP] [<id, optional>] [<value, optional>]
-    string clientid = 3; //track which client made this entry
+    string clientid = 3; // track which client made this entry
 }
 
 message AppendEntriesMessage {

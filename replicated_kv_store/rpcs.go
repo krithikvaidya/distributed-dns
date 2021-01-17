@@ -76,8 +76,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	// here we can be sure that the node's current term and the term in the message match, and that the node is not a leader or a
 	// candidate.
 	node.electionResetEvent <- true
-  
-  node.leaderAddress = in.LeaderAddr // gets the leaders address
+
+	node.leaderAddress = in.LeaderAddr // gets the leaders address
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -157,7 +157,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
-		log.Printf("\nunlocked in AE\n")
 		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil

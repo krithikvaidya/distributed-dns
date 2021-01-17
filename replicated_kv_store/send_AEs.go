@@ -60,7 +60,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		// will reach here if response.Term <= node.currentTerm and response.Success == false
 		// decrement nextIndex and retry the RPC, and keep repeating until it succeeds
 		node.nextIndex[replica_id]--
-		log.Printf("\nDecreasing for %d\n", replica_id)
+
 		var entries []*protos.LogEntry
 
 		for i := msg.PrevLogIndex; i <= upper_index; i++ {

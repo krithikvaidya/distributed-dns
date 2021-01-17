@@ -12,16 +12,21 @@ import (
 )
 
 //WriteCommand is called when the client sends the replica a write request.
-func (node *RaftNode) WriteCommand(operation []string, client string) bool {
+func (node *RaftNode) WriteCommand(operation []string, client string) (bool, error) {
 
-	// Perform operation only if leader
 	var equal bool
-	lastClientOper, val := node.trackMessage[client] //lastClientOper is the operation done by the previous client
-	if val {                                         //check if entry exists; if it does check if its the same as the one that was previously
+	var Err error
+
+	lastClientOper, val := node.trackMessage[client] //lastClientOper is the operation done by the given client previously
+
+	//check if entry exists; if it does check if its the same as the one that was previously
+	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
 	}
-	if !equal || !val { //if entry isnt the same or entry doesnt exist
 
+	if !equal || !val { //if entry isnt the same OR if it doesn't exist
+
+		// Perform operation only if leader
 		if node.state == Leader {
 
 			//append to local log
@@ -49,24 +54,33 @@ func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 			node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
 
 			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
+
 			if success {
+
 				node.raft_node_mutex.Lock()
 				node.commitIndex++
 				node.raft_node_mutex.Unlock()
 				node.commits_ready <- 1
-				log.Printf("\nWrite operation successfully completed and committed.\n")
-			} else {
-				log.Printf("\nWrite operation failed.\n")
+
+				node.trackMessage[client] = operation
 			}
-			node.trackMessage[client] = operation
-			return success
+
+			if !success {
+				Err = errors.New("Write operation failed. Write could not be replicated on majority of nodes.")
+			}
+
+			return success, Err
 		}
-	} else {
-		return false
 	}
 
+	if equal {
+		Err = errors.New("Write operation failed. Already received identical write request from identical clientid.")
+	}
+
+	// client had already asked us to perform this operation OR we're not a leader
 	node.raft_node_mutex.Unlock()
-	return false
+	return false, Err
+
 }
 
 // ReadCommand is different since read operations do not need to be added to log
