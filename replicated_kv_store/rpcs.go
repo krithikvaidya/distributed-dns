@@ -79,6 +79,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	node.leaderAddress = in.LeaderAddr // gets the leaders address
 
+	node.latestClient = in.LatestClient // stores the id of the most recent client
+
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 

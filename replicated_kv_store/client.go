@@ -32,6 +32,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	//check if entry exists; if it does check if its the same as the one that was previously
 	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
+		equal = equal && client == node.latestClient
 	}
 
 	if !equal || !val { //if entry isnt the same OR if it doesn't exist

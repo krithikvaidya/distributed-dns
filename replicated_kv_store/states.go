@@ -95,6 +95,7 @@ func (node *RaftNode) ToLeader() {
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
 		LeaderAddr:   node.nodeAddress,
+		LatestClient: node.latestClient,
 	}
 
 	node.persistToStorage()
