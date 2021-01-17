@@ -38,7 +38,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		// will reach here if response.Term <= node.currentTerm and response.Success == false
 		// decrement nextIndex and retry the RPC, and keep repeating until it succeeds
 		node.nextIndex[replica_id]--
-
+		log.Printf("\nDecreasing for %d\n", replica_id)
 		var entries []*protos.LogEntry
 
 		for i := msg.PrevLogIndex; i <= upper_index; i++ {
@@ -96,10 +96,21 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 			node.raft_node_mutex.Lock()
 			//log.Printf("Lock on %d", replica_id)
+			prevLogIndex := node.nextIndex[replica_id] - 1
+			prevLogTerm := int32(-1)
+
+			if prevLogIndex >= 0 {
+				prevLogTerm = node.log[prevLogIndex].Term
+			}
+
+			msg.PrevLogIndex = prevLogIndex
+			msg.PrevLogTerm = prevLogTerm
 
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
 
 				tot_success := atomic.AddInt32(&successes, 1)
+
+				//log.Printf("Sending AE SUCCESS for replica %v\n", replica_id)
 
 				if tot_success == (node.n_replicas)/2+1 { // write quorum achieved
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
@@ -108,7 +119,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				log.Printf("Sending AE FAILED for replica %v\n", replica_id)
+				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
 
 				if tot_fail == (node.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
@@ -130,7 +141,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(2000 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {

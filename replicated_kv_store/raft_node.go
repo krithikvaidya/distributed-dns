@@ -2,16 +2,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -117,25 +114,41 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 		client_objs[i] = cli
 
-		clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
+		/*clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
 		ctx, _ := context.WithDeadline(context.Background(), clientDeadline)
-
 		// ReplicaReady is an RPC defined to inform the other replica about our connection
 		_, err = cli.ReplicaReady(ctx, &empty.Empty{})
-		CheckErrorFatal(err)
+		CheckErrorFatal(err)*/
+		//NOOOOOTTTTEEEEEEE - Don't need that rpc anymore
 
 		log.Printf("\nConnected to replica %v\n", i)
-
 	}
 
 	node.raft_node_mutex.Lock()
 
-	go node.RunElectionTimer() // RunElectionTimer defined in election.go
+	if node.state == Follower {
+		go node.RunElectionTimer() // RunElectionTimer defined in election.go
+		node.electionTimerRunning = true
 
-	node.electionTimerRunning = true
-	node.peer_replica_clients = client_objs
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+	}
 
-	node.raft_node_mutex.Unlock()
+	//If candidate let it continue election some leader will make it back to follower and then
+	//timer also will be called from election function
+	if node.state == Candidate {
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+
+		node.StartElection()
+	}
+
+	// if node was a leader before then don't call election timer now
+	// append entries of current leader will automatically convert it back to follower and call
+	if node.state == Leader {
+		node.peer_replica_clients = client_objs
+		node.raft_node_mutex.Unlock()
+	}
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {

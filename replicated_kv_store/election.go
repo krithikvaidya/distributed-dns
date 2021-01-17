@@ -14,7 +14,7 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(150+rand.Intn(300)) * time.Millisecond
+	duration := time.Duration(5000+rand.Intn(10000)) * time.Millisecond
 
 	select {
 
@@ -131,7 +131,7 @@ func (node *RaftNode) StartElection() {
 		replica_id++
 
 	}
-
+	//**NOTE** this will mostly have to be changed
 	node.electionTimerRunning = false // will be true only when in follower state and election timer is running
 	go node.RunElectionTimer()        // begin the timer during which this candidate waits for votes
 }
