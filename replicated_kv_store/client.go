@@ -6,54 +6,63 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"reflect"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 //WriteCommand is called when the client sends the replica a write request.
-func (node *RaftNode) WriteCommand(operation []string) bool {
+func (node *RaftNode) WriteCommand(operation []string, client string) bool {
 
 	// Perform operation only if leader
-	if node.state == Leader {
+	var equal bool
+	lastClientOper, val := node.trackMessage[client] //lastClientOper is the operation done by the previous client
+	if val {                                         //check if entry exists; if it does check if its the same as the one that was previously
+		equal = reflect.DeepEqual(lastClientOper, operation)
+	}
+	if !equal || !val { //if entry isnt the same or entry doesnt exist
 
-		//append to local log
-		node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+		if node.state == Leader {
 
-		// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
+			//append to local log
+			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
 
-		var entries []*protos.LogEntry
-		entries = append(entries, &node.log[len(node.log)-1])
+			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
-		msg := &protos.AppendEntriesMessage{
+			var entries []*protos.LogEntry
+			entries = append(entries, &node.log[len(node.log)-1])
 
-			Term:         node.currentTerm,
-			LeaderId:     node.replica_id,
-			PrevLogIndex: int32(len(node.log) - 1),
-			PrevLogTerm:  node.log[len(node.log)-1].Term,
-			LeaderCommit: node.commitIndex,
-			Entries:      entries,
+			msg := &protos.AppendEntriesMessage{
+
+				Term:         node.currentTerm,
+				LeaderId:     node.replica_id,
+				PrevLogIndex: int32(len(node.log) - 1),
+				PrevLogTerm:  node.log[len(node.log)-1].Term,
+				LeaderCommit: node.commitIndex,
+				Entries:      entries,
+			}
+
+			successful_write := make(chan bool)
+
+			node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
+
+			node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+
+			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
+			if success {
+				node.raft_node_mutex.Lock()
+				node.commitIndex++
+				node.raft_node_mutex.Unlock()
+				node.commits_ready <- 1
+				log.Printf("\nWrite operation successfully completed and committed.\n")
+			} else {
+				log.Printf("\nWrite operation failed.\n")
+			}
+			node.trackMessage[client] = operation
+			return success
 		}
-
-		successful_write := make(chan bool)
-
-		node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
-
-		node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
-
-		success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
-
-		if success {
-			node.raft_node_mutex.Lock()
-			node.commitIndex++
-			node.persistToStorage()
-			node.raft_node_mutex.Unlock()
-			node.commits_ready <- 1
-			log.Printf("\nWrite operation successfully completed and committed.\n")
-		} else {
-			log.Printf("\nWrite operation failed.\n")
-		}
-
-		return success
+	} else {
+		return false
 	}
 
 	node.raft_node_mutex.Unlock()

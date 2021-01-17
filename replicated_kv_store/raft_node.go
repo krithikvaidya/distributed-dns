@@ -26,6 +26,7 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
+
 	ready_chan            chan bool                       // Channel to signal whether the node is ready for operation
 	n_replicas            int32                           // The number of replicas in the current replicated system
 	replicas_ready        int32                           // number of replicas that have connected to this replica's gRPC server.
@@ -35,13 +36,17 @@ type RaftNode struct {
 	kvstore_addr          string                          // stores respective port on which local key value store is running
 	commits_ready         chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
 	commits_applied_to_kv chan bool                       // Channel to indicate completion of changes applied to key value store
+
+	trackMessage map[string][]string // tracks messages sent by clients
+
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int32             // Latest term server has seen
-	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
-	log         []protos.LogEntry // The array of the log entry structs
-
+	currentTerm   int32             // Latest term server has seen
+	votedFor      int32             // Candidate ID of the node that received vote from current node in the latest term
+	log           []protos.LogEntry // The array of the log entry structs
+	leaderAddress string
+	nodeAddress   string
 	// State to be maintained on all replicas (unpersisted)
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
@@ -70,6 +75,8 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		kvstore_addr:          keyvalue_port,
 		commits_ready:         make(chan int32),
 		commits_applied_to_kv: make(chan bool),
+
+		trackMessage: make(map[string][]string),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,

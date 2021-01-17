@@ -76,6 +76,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	// here we can be sure that the node's current term and the term in the message match, and that the node is not a leader or a
 	// candidate.
 	node.electionResetEvent <- true
+  
+  node.leaderAddress = in.LeaderAddr // gets the leaders address
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -115,7 +117,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
-
+			node.trackMessage[node.log[logIndex].Clientid] = node.log[logIndex].Operation //Updates the trackMessages for each client to the latest operation
 			logIndex++
 
 		}

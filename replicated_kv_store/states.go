@@ -81,7 +81,7 @@ func (node *RaftNode) ToLeader() {
 	var operation []string
 	operation = append(operation, "NO-OP")
 
-	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: " "})
 
 	var entries []*protos.LogEntry
 	entries = append(entries, &node.log[len(node.log)-1])
@@ -94,6 +94,7 @@ func (node *RaftNode) ToLeader() {
 		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
+		LeaderAddr:   node.nodeAddress,
 	}
 
 	node.persistToStorage()

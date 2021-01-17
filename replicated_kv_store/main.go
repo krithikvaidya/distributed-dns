@@ -41,6 +41,8 @@ func StartKVStore(addr string) {
 // Start a server to listen for client requests
 func (node *RaftNode) StartRaftServer(addr string) {
 
+	node.nodeAddress = addr //store address of the node
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/test", node.TestHandler).Methods("GET")
