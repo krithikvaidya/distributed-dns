@@ -31,14 +31,11 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
+
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-<<<<<<< HEAD
-		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n") //sends leader address if its not the leader
-		node.raft_node_mutex.RUnlock()
-=======
+
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
-		node.raft_node_mutex.Unlock()
->>>>>>> 22bd202a00410b369a193c0ced8db2062019b3c9
+		node.raft_node_mutex.RUnlock()
 		return
 	}
 
