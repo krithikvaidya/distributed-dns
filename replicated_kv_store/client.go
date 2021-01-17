@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -14,6 +15,15 @@ import (
 //WriteCommand is called when the client sends the replica a write request.
 func (node *RaftNode) WriteCommand(operation []string, client string) (bool, error) {
 
+	for node.commitIndex != node.lastApplied {
+		node.raft_node_mutex.RUnlock()
+		time.Sleep(20 * time.Millisecond)
+		node.raft_node_mutex.RLock()
+	}
+	node.raft_node_mutex.RUnlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+	node.raft_node_mutex.Lock()
+
+	// Perform operation only if leader
 	var equal bool
 	var Err error
 
@@ -51,7 +61,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 			node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
 
-			node.raft_node_mutex.Unlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+			node.raft_node_mutex.Unlock()
 
 			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
 
@@ -85,6 +95,11 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 // ReadCommand is different since read operations do not need to be added to log
 func (node *RaftNode) ReadCommand(key string) (string, error) {
+	for node.commitIndex != node.lastApplied {
+		node.raft_node_mutex.RUnlock()
+		time.Sleep(20 * time.Millisecond)
+		node.raft_node_mutex.RLock()
+	}
 
 	write_success := make(chan bool)
 	node.StaleReadCheck(write_success)
@@ -125,6 +140,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 	}
 
 	return "unable to perform read", errors.New("read_failed")
+
 }
 
 // StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come

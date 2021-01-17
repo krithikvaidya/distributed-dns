@@ -20,17 +20,25 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
 		return
 	}
 
-	node.raft_node_mutex.Lock()
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+<<<<<<< HEAD
+		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		node.raft_node_mutex.RUnlock()
+=======
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.Unlock()
+>>>>>>> 22bd202a00410b369a193c0ced8db2062019b3c9
 		return
 	}
 
@@ -59,6 +67,9 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nGET request received\n")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
 	// TODO: Make sure all committed entries are applied before responding to it.
 
@@ -91,12 +102,15 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPUT request received\n")
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
 		return
 	}
 
-	node.raft_node_mutex.Lock()
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
@@ -136,7 +150,10 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.Lock()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	node.raft_node_mutex.RLock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
