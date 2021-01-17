@@ -26,15 +26,6 @@ const (
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
-	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
-	n_replicas           int32                           // The number of replicas in the current replicated system
-	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int32                           // The unique ID for the current replica
-	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
-	electionTimerRunning bool                            // will be true if the node is a follower and the election timer is running
-	kvstore_addr         string                          // stores respective port on which local key value store is running
-	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
 
 	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
 	n_replicas           int32                           // The number of replicas in the current replicated system
