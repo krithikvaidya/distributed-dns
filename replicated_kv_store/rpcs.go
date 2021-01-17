@@ -40,13 +40,13 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		log.Printf("\nGranting vote\n")
 		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
-		return &protos.RequestVoteResponse{Term: node.currentTerm, VoteGranted: true}, nil
+		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: true}, nil
 
 	} else {
 
 		log.Printf("\nRejecting vote\n")
 		node.raft_node_mutex.Unlock()
-		return &protos.RequestVoteResponse{Term: node.currentTerm, VoteGranted: false}, nil
+		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: false}, nil
 
 	}
 
@@ -54,14 +54,11 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
-	log.Printf("\nreceived AE!\n")
 	node.raft_node_mutex.Lock()
-	log.Printf("\nlocked in AE\n")
 
 	// term received is lesser than current term. CHECK: we don't reset election timer here.
 	if node.currentTerm > in.Term {
 		node.raft_node_mutex.Unlock()
-		log.Printf("\nunlocked in AE\n")
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 
 	} else if node.currentTerm < in.Term {
@@ -145,24 +142,23 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			}
 			node.persistToStorage()
 
-			log.Printf("\nunlocked in AE\n")
 			node.raft_node_mutex.Unlock()
 
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		} else {
-			log.Printf("\nunlocked in AE\n")
+
 			node.raft_node_mutex.Unlock()
 		}
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil // TODO: get node.currentTerm before unlock
+		return &protos.AppendEntriesResponse{Term: in.Term, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
 		log.Printf("\nunlocked in AE\n")
 		node.raft_node_mutex.Unlock()
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil // TODO: get node.currentTerm before unlock
+		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil
 
 	}
 

@@ -38,6 +38,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		response, err = client_obj.AppendEntries(ctx, msg)
 
 		if err != nil {
+			// log.Printf("\nReturning false because: %v\n", err)
 			return false
 		}
 	}
@@ -45,12 +46,14 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	if response.Success == false {
 
 		if node.state != Leader {
+			log.Printf("\nReturning false in LeaderSendAE because: node.state != Leader\n")
 			return false
 		}
 
 		if response.Term > node.currentTerm {
 
 			node.ToFollower(response.Term)
+			log.Printf("\nReturning false in LeaderSendAE because: response.Term > node.currentTerm\n")
 			return false
 		}
 
@@ -160,7 +163,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -200,7 +203,6 @@ func (node *RaftNode) HeartBeats() {
 		node.raft_node_mutex.RUnlock()
 
 		success := make(chan bool)
-		log.Printf("\nSENDING HEARTBEAT\n")
 		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)
 		<-success
 
