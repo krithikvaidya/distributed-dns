@@ -2,16 +2,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -39,13 +36,25 @@ type RaftNode struct {
 	kvstore_addr         string                          // stores respective port on which local key value store is running
 	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
 
+	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
+	n_replicas           int32                           // The number of replicas in the current replicated system
+	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
+	replica_id           int32                           // The unique ID for the current replica
+	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
+	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
+	kvstore_addr         string                          // stores respective port on which local key value store is running
+	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
+
+	trackMessage map[string][]string // tracks messages sent by clients
+
 	// States mentioned in figure 2 of the paper:
 
 	// State to be maintained on all replicas (TODO: persist)
-	currentTerm int32             // Latest term server has seen
-	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
-	log         []protos.LogEntry // The array of the log entry structs
-
+	currentTerm   int32             // Latest term server has seen
+	votedFor      int32             // Candidate ID of the node that received vote from current node in the latest term
+	log           []protos.LogEntry // The array of the log entry structs
+	leaderAddress string
+	nodeAddress   string
 	// State to be maintained on all replicas (unpersisted)
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
@@ -71,9 +80,10 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		replica_id:           int32(rid),
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
 		state:                Follower, // all nodes are initialized as followers
-		electionTimerRunning: false,
 		kvstore_addr:         keyvalue_port,
 		commits_ready:        make(chan int32),
+
+		trackMessage: make(map[string][]string),
 
 		currentTerm: 0, // unpersisted
 		votedFor:    -1,
@@ -88,19 +98,30 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 	}
 
 	if rn.storage.HasData(rn.fileStored) {
+
 		rn.restoreFromStorage(rn.storage)
+		log.Printf("\nRestored Persisted Data:\n")
+		log.Printf("\nCurrent currentTerm: %v\nCurrent votedFor: %v\nCurrent log: %v\nCurrent log length: %v\n", rn.currentTerm, rn.votedFor, rn.log, len(rn.log))
+
+	} else {
+
+		log.Printf("\nNo persisted data found.\n")
+
 	}
 
-	log.Printf("\ncurrent currentTerm: %v\ncurrent votedFor: %v\n current log: %v\ncurrent LogLen: %v\n", rn.currentTerm, rn.votedFor, rn.log, len(rn.log))
 	return rn
 
 }
 
 func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
-	// Attempt to connect to the gRPC servers of all other replicas
-	// The clients for each corresponding server is stored in client_objs
+	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
+	// The clients for each corresponding server is stored in client_objs.
 	client_objs := make([]protos.ConsensusServiceClient, node.n_replicas)
+
+	// NOTE: even if the grpc Dial to a given server fails the first time, the client stub can still be obtained.
+	// RPC requests using such client stubs will succeed when the connection can be established to
+	// the gRPC server.
 
 	for i := int32(0); i < node.n_replicas; i++ {
 
@@ -109,32 +130,43 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		}
 
 		connxn, err := grpc.Dial(rep_addrs[i], grpc.WithInsecure())
-		CheckErrorFatal(err)
+		CheckErrorFatal(err) // there will NOT be an error if the gRPC server is down.
 
 		// Obtain client stub
 		cli := protos.NewConsensusServiceClient(connxn)
 
 		client_objs[i] = cli
+	}
 
-		clientDeadline := time.Now().Add(time.Duration(5) * time.Second)
-		ctx, _ := context.WithDeadline(context.Background(), clientDeadline)
+	node.peer_replica_clients = client_objs
 
-		// ReplicaReady is an RPC defined to inform the other replica about our connection
-		_, err = cli.ReplicaReady(ctx, &empty.Empty{})
-		CheckErrorFatal(err)
+	// Check what the persisted state was (if any), and accordingly proceed
+	node.raft_node_mutex.Lock()
+	defer node.raft_node_mutex.Unlock()
 
-		log.Printf("\nConnected to replica %v\n", i)
+	if node.state == Follower {
+
+		go node.RunElectionTimer() // RunElectionTimer defined in election.go
+
+	} else if node.state == Candidate {
+
+		// If candidate, let it restart election. The timer for waiting
+		// for votes from other replicas will be called in StartElection
+		node.StartElection()
+
+		// CHECK:
+		// We don't call ToCandidate immediately here because we don't want to increment
+		// currentTerm and node.state and node.votedFor are already set correctly, so
+		// nothing to persist.
+
+	} else if node.state == Leader {
+
+		// if node was a leader before we want to give up leadership.
+		// the new leader will soon send an heartbeat/appendentries, which will
+		// automatically convert it back to follower and call the election timer.
 
 	}
 
-	node.raft_node_mutex.Lock()
-
-	go node.RunElectionTimer() // RunElectionTimer defined in election.go
-
-	node.electionTimerRunning = true
-	node.peer_replica_clients = client_objs
-
-	node.raft_node_mutex.Unlock()
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {
@@ -142,19 +174,19 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
 		temp.Decode(&node.currentTerm)
 	} else {
-		log.Printf("\ncurrentTerm not found in storage")
+		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
 	if votedcheck, check := node.storage.Get("votedFor", node.fileStored); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
 		temp.Decode(&node.votedFor)
 	} else {
-		log.Printf("\nvotedFor not found in storage")
+		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
 	if logentries, check := node.storage.Get("log", node.fileStored); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
 		temp.Decode(&node.log)
 	} else {
-		log.Printf("\nlog not found in storage")
+		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
 }
 
@@ -181,7 +213,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 		// log.Printf("\nIn ApplyToStateMachine\n")
 		to_commit := <-node.commits_ready
-		log.Printf("\nReceived commit(s)\n")
+		log.Printf("\nApplyToStateMachine received commit(s)\n")
 
 		node.raft_node_mutex.Lock()
 
@@ -207,7 +239,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 				if err != nil {
 					log.Printf("\nError in client.Do(req): %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -223,7 +254,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -232,7 +262,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -244,7 +273,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -253,7 +281,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}

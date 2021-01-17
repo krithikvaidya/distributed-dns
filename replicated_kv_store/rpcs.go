@@ -4,48 +4,14 @@ import (
 	"context"
 	"log"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
-
-// RPC declared in protos/replica.proto.
-// When a replica performs the gRPC dial to another replica and obtains the
-// corresponding client stub, it will invoke this RPC to inform the other replica
-// that it has connected. (This RPC might be unnecessary if the initial setup procedure is refined)
-func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
-
-	log.Printf("\nReceived ReplicaReady Notification\n")
-
-	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
-	node.raft_node_mutex.Lock()
-
-	node.replicas_ready += 1
-
-	if node.replicas_ready == node.n_replicas-1 {
-
-		// Using defer does not work here. Not sure why
-		go func(node *RaftNode) {
-
-			node.ready_chan <- true
-
-		}(node)
-
-		log.Printf("\nAll replicas have connected.\n")
-
-	}
-
-	node.raft_node_mutex.Unlock()
-	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
-
-	return &empty.Empty{}, nil
-}
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
 	// log.Printf("\nIn RequestVote. RWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
 
-	node_current_term := node.currentTerm
 	latestLogIndex := int32(-1)
 	latestLogTerm := int32(-1)
 
@@ -54,25 +20,21 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 		latestLogTerm = node.log[latestLogIndex].Term
 	}
 
-	log.Printf("\nReceived term: %v, My term: %v, My votedFor: %v\n", in.Term, node_current_term, node.votedFor)
+	log.Printf("\nReceived term: %v, My term: %v, My votedFor: %v\n", in.Term, node.currentTerm, node.votedFor)
 	log.Printf("\nReceived latestLogIndex: %v, My latestLogIndex: %v, Received latestLogTerm: %v, My latestLogTerm: %v\n", in.LastLogIndex, latestLogIndex, in.LastLogTerm, latestLogTerm)
 
 	// If the received message's term is greater than the replica's current term, transition to
 	// follower (if not already a follower) and update term.
-	if in.Term > node_current_term {
+	if in.Term > node.currentTerm {
 		node.ToFollower(in.Term)
-		// log.Printf("\nAfter tofollower, my term %v\n", node.currentTerm)
 	}
 
-	// Grant vote if the received message's term is not lesser than the replica's term, and if the
-	// candidate's log is atleast as up-to-date as the replica's.
+	// If ToFollower was called above, in.Term and node.currentTerm will be equal. If in.Term < node.currentTerm, reject vote.
+	// If the candidate's log is not atleast as up-to-date as the replica's, reject vote.
 	if (node.votedFor == in.CandidateId) ||
-		((in.Term > node_current_term) && (node.votedFor == -1) &&
+		((in.Term == node.currentTerm) && (node.votedFor == -1) &&
 			(in.LastLogTerm > latestLogTerm || ((in.LastLogTerm == latestLogTerm) && (in.LastLogIndex >= latestLogIndex)))) {
 
-		if node.electionTimerRunning {
-			node.electionResetEvent <- true
-		}
 		node.votedFor = in.CandidateId
 
 		log.Printf("\nGranting vote\n")
@@ -83,9 +45,8 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 	} else {
 
 		log.Printf("\nRejecting vote\n")
-		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
-		return &protos.RequestVoteResponse{Term: node_current_term, VoteGranted: false}, nil
+		return &protos.RequestVoteResponse{Term: in.Term, VoteGranted: false}, nil
 
 	}
 
@@ -95,7 +56,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	node.raft_node_mutex.Lock()
 
-	// term received is lesser than current term
+	// term received is lesser than current term. CHECK: we don't reset election timer here.
 	if node.currentTerm > in.Term {
 		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
@@ -112,14 +73,16 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	}
 
-	// here we can be sure that the node's current term and the term in the message match.
-	if node.electionTimerRunning {
-		node.electionResetEvent <- true
-	}
+	// here we can be sure that the node's current term and the term in the message match, and that the node is not a leader or a
+	// candidate.
+	node.electionResetEvent <- true
+  
+  node.leaderAddress = in.LeaderAddr // gets the leaders address
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 
+		//log.Printf("\nin.PrevLogIndex : %d, in.PrevLogTerm : %d\n", in.PrevLogIndex, in.PrevLogTerm)
 		logIndex := int(in.PrevLogIndex + 1)
 		entryIndex := 0
 
@@ -154,7 +117,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
-
+			node.trackMessage[node.log[logIndex].Clientid] = node.log[logIndex].Operation //Updates the trackMessages for each client to the latest operation
 			logIndex++
 
 		}
@@ -186,16 +149,18 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		} else {
+
 			node.raft_node_mutex.Unlock()
 		}
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
+		return &protos.AppendEntriesResponse{Term: in.Term, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
+		log.Printf("\nunlocked in AE\n")
 		node.raft_node_mutex.Unlock()
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil
 
 	}
 

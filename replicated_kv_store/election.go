@@ -14,21 +14,38 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(150+rand.Intn(300)) * time.Millisecond
+	duration := time.Duration(300+rand.Intn(200)) * time.Millisecond
 
 	select {
 
 	case <-time.After(duration): // for timeout to call election
 
+		node.raft_node_mutex.Lock()
+
+		// by the time the lock was acquired, if the electionResetEvent or the stopElectionTimer channels
+		// are written to, don't transition to candidate.
+		select {
+
+		case <-node.stopElectiontimer: //to stop timer
+			node.raft_node_mutex.Unlock()
+			return
+
+		case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
+
+			node.raft_node_mutex.Unlock()
+			go node.RunElectionTimer()
+			return
+
+		default:
+			break // break out of select block
+		}
+
 		log.Printf("\nElection timer runs out.\n")
+
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 
-		node.raft_node_mutex.Lock()
-
 		node.ToCandidate()
-
-		// log.Printf("\nUnlocked in AppendEntries\n")
 
 		node.raft_node_mutex.Unlock()
 		return
@@ -37,7 +54,6 @@ func (node *RaftNode) RunElectionTimer() {
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
-		//log.Println("\nReset Timer")
 		go node.RunElectionTimer()
 		return
 
@@ -87,8 +103,9 @@ func (node *RaftNode) StartElection() {
 			// log.Printf("\nLock in StartElection after response\n")
 			if err == nil {
 
+				// log.Printf("\nReceived reply from %v\n", replica_id)
+
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
-				log.Printf("\nReceived reply from %v\n", replica_id)
 
 				if node.state != Candidate {
 					node.raft_node_mutex.Unlock()
@@ -105,7 +122,7 @@ func (node *RaftNode) StartElection() {
 
 					if response.VoteGranted {
 
-						log.Printf("\nReceived vote from %v\n", replica_id)
+						// log.Printf("\nReceived vote from %v\n", replica_id)
 						votes := int(atomic.AddInt32(&received_votes, 1))
 
 						if votes*2 > int(node.n_replicas) { // won the Election
@@ -120,7 +137,7 @@ func (node *RaftNode) StartElection() {
 
 			} else {
 
-				log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
+				// log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
 
 			}
 
@@ -132,6 +149,5 @@ func (node *RaftNode) StartElection() {
 
 	}
 
-	node.electionTimerRunning = false // will be true only when in follower state and election timer is running
-	go node.RunElectionTimer()        // begin the timer during which this candidate waits for votes
+	go node.RunElectionTimer() // begin the timer during which this candidate waits for votes
 }

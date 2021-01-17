@@ -9,6 +9,7 @@ import (
 // ToFollower is called when you get a term higher than your own
 func (node *RaftNode) ToFollower(term int32) {
 
+	log.Printf("\nIn ToFollower, previous state: %v\n", node.state)
 	prevState := node.state
 	node.state = Follower
 	node.currentTerm = term
@@ -16,17 +17,18 @@ func (node *RaftNode) ToFollower(term int32) {
 
 	node.persistToStorage()
 
-	// If node was a leader or candidate, start election timer. Else if it was a follower, reset the election timer.
+	// CHECK: If node was a leader, start election timer. Else if it was a follower or
+	// candidate, reset the election timer.
 
-	if prevState == Leader || prevState == Candidate {
-		node.electionTimerRunning = true
+	if prevState == Leader {
 		go node.RunElectionTimer()
 	} else {
-		if node.electionTimerRunning {
+		go func() {
 			node.electionResetEvent <- true
-		}
+		}()
 	}
 
+	log.Printf("\nFinished ToFollower\n")
 }
 
 // ToCandidate is called when election timer runs out
@@ -47,7 +49,6 @@ func (node *RaftNode) ToLeader() {
 	log.Printf("\nTransitioned to leader\n")
 	// stop election timer since leader doesn't need it
 	node.stopElectiontimer <- true
-	node.electionTimerRunning = false
 
 	node.state = Leader
 
@@ -80,7 +81,7 @@ func (node *RaftNode) ToLeader() {
 	var operation []string
 	operation = append(operation, "NO-OP")
 
-	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation})
+	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: " "})
 
 	var entries []*protos.LogEntry
 	entries = append(entries, &node.log[len(node.log)-1])
@@ -93,6 +94,7 @@ func (node *RaftNode) ToLeader() {
 		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
+		LeaderAddr:   node.nodeAddress,
 	}
 
 	node.persistToStorage()
