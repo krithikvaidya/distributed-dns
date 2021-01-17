@@ -55,7 +55,7 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 //handles get requests
 func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "\nGET request received\n")
+	log.Printf("\nGET request received\n")
 
 	// TODO: Make sure all committed entries are applied before responding to it.
 
@@ -86,7 +86,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 //handles all put requests
 func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "\nPUT request received\n")
+	log.Printf("\nPUT request received\n")
 
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
@@ -123,7 +123,7 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 //handles all delete requests
 func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "\nDELETE request received\n")
+	log.Printf("\nDELETE request received\n")
 
 	if err := r.ParseForm(); err != nil {
 		fmt.Fprintf(w, "ParseForm() err: %v", err)
