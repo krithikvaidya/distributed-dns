@@ -4,41 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
-
-// RPC declared in protos/replica.proto.
-// When a replica performs the gRPC dial to another replica and obtains the
-// corresponding client stub, it will invoke this RPC to inform the other replica
-// that it has connected. (This RPC might be unnecessary if the initial setup procedure is refined)
-func (node *RaftNode) ReplicaReady(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
-
-	log.Printf("\nReceived ReplicaReady Notification\n")
-
-	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
-	node.raft_node_mutex.Lock()
-
-	node.replicas_ready += 1
-
-	if node.replicas_ready == node.n_replicas-1 {
-
-		// Using defer does not work here. Not sure why
-		go func(node *RaftNode) {
-
-			node.ready_chan <- true
-
-		}(node)
-
-		log.Printf("\nAll replicas have connected.\n")
-
-	}
-
-	node.raft_node_mutex.Unlock()
-	// log.Printf("\nRWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
-
-	return &empty.Empty{}, nil
-}
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
@@ -188,14 +155,14 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			node.raft_node_mutex.Unlock()
 		}
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
+		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil // TODO: get node.currentTerm before unlock
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
 		log.Printf("\nunlocked in AE\n")
 		node.raft_node_mutex.Unlock()
 
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil // TODO: get node.currentTerm before unlock
 
 	}
 

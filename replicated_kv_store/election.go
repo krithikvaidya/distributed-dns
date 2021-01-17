@@ -14,15 +14,13 @@ import (
 func (node *RaftNode) RunElectionTimer() {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
+	duration := time.Duration(300+rand.Intn(200)) * time.Millisecond
 
 	select {
 
 	case <-time.After(duration): // for timeout to call election
 
-		log.Printf("\nTrying to get lock in election timeout\n")
 		node.raft_node_mutex.Lock()
-		log.Printf("\nGot lock in election timeout\n")
 
 		// by the time the lock was acquired, if the electionResetEvent or the stopElectionTimer channels
 		// are written to, don't transition to candidate.
@@ -105,8 +103,9 @@ func (node *RaftNode) StartElection() {
 			// log.Printf("\nLock in StartElection after response\n")
 			if err == nil {
 
+				// log.Printf("\nReceived reply from %v\n", replica_id)
+
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
-				log.Printf("\nReceived reply from %v\n", replica_id)
 
 				if node.state != Candidate {
 					node.raft_node_mutex.Unlock()
@@ -123,7 +122,7 @@ func (node *RaftNode) StartElection() {
 
 					if response.VoteGranted {
 
-						log.Printf("\nReceived vote from %v\n", replica_id)
+						// log.Printf("\nReceived vote from %v\n", replica_id)
 						votes := int(atomic.AddInt32(&received_votes, 1))
 
 						if votes*2 > int(node.n_replicas) { // won the Election

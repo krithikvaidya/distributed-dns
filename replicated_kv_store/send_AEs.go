@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"google.golang.org/grpc"
 )
 
 // To send AppendEntry to single replica, and retry if needed (called by LeaderSendAEs defined below).
@@ -16,11 +18,28 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
-		return false
+
+		// If there was a problem connecting to the gRPC server and invoking the RPC,
+		// we retry dialing to that server and performing the RPC. If this fails too, return false.
+
+		connxn, err := grpc.Dial(":500"+strconv.Itoa(int(replica_id)), grpc.WithInsecure())
+
+		// Obtain client stub
+		cli := protos.NewConsensusServiceClient(connxn)
+
+		node.peer_replica_clients[replica_id] = cli
+
+		// Call the AppendEntries RPC for the given client
+		ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		response, err = client_obj.AppendEntries(ctx, msg)
+
+		if err != nil {
+			return false
+		}
 	}
 
 	if response.Success == false {
@@ -141,7 +160,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {

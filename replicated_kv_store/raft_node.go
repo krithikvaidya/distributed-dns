@@ -199,7 +199,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 		// log.Printf("\nIn ApplyToStateMachine\n")
 		to_commit := <-node.commits_ready
-		log.Printf("\nReceived commit(s)\n")
+		log.Printf("\nApplyToStateMachine received commit(s)\n")
 
 		node.raft_node_mutex.Lock()
 
@@ -225,7 +225,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 				if err != nil {
 					log.Printf("\nError in client.Do(req): %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -241,7 +240,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -250,7 +248,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -262,7 +259,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
@@ -271,7 +267,6 @@ func (node *RaftNode) ApplyToStateMachine() {
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					log.Printf("\nUnLocked in ApplyToStateMachine\n")
 					node.raft_node_mutex.Unlock()
 					break
 				}
