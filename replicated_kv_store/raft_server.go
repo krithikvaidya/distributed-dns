@@ -32,8 +32,13 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
+<<<<<<< HEAD
 		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
+=======
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		node.raft_node_mutex.Unlock()
+>>>>>>> 22bd202a00410b369a193c0ced8db2062019b3c9
 		return
 	}
 
@@ -48,10 +53,13 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	operation[1] = key
 	operation[2] = value
 
-	if node.WriteCommand(operation, client) { // Mutex will be unlocked in WriteCommand
-		fmt.Fprintf(w, "\nSuccessful POST\n")
+	success, err := node.WriteCommand(operation, client)
+	if success { // Mutex will be unlocked in WriteCommand
+		log.Printf("\nPOST request completed successfully and committed.\n")
+		fmt.Fprintf(w, "\nPOST request completed successfully and committed.\n")
 	} else {
-		fmt.Fprintf(w, "\nPOST request failed to be completed.\n")
+		log.Printf("\n%v\n", err.Error())
+		fmt.Fprintf(w, "\n%v\n", err.Error())
 	}
 }
 
@@ -69,7 +77,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -106,7 +114,7 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n")
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -121,10 +129,13 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 	operation[1] = key
 	operation[2] = value
 
-	if node.WriteCommand(operation, client) {
-		fmt.Fprintf(w, "\nPUT success.\n")
+	success, err := node.WriteCommand(operation, client)
+	if success { // Mutex will be unlocked in WriteCommand
+		log.Printf("\nPUT request completed successfully and committed.\n")
+		fmt.Fprintf(w, "\nPUT request completed successfully and committed.\n")
 	} else {
-		fmt.Fprintf(w, "\nPUT failed.\n")
+		log.Printf("\n%v\n", err.Error())
+		fmt.Fprintf(w, "\n%v\n", err.Error())
 	}
 
 }
@@ -146,22 +157,24 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nserverAddress: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
 		return
 	}
 
 	params := mux.Vars(r)
 	key := params["key"]
-	client := r.FormValue("client")
 
 	operation := make([]string, 2)
 	operation[0] = "DELETE"
 	operation[1] = key
 
-	if node.WriteCommand(operation, client) {
-		fmt.Fprintf(w, "\nDELETE success.\n")
+	success, err := node.WriteCommand(operation, "")
+	if success { // Mutex will be unlocked in WriteCommand
+		log.Printf("\nDELETE requested completed successfully and committed.\n")
+		fmt.Fprintf(w, "\nDELETE requested completed successfully and committed.\n")
 	} else {
-		fmt.Fprintf(w, "\nDELETE failed.\n")
+		log.Printf("\n%v\n", err.Error())
+		fmt.Fprintf(w, "\n%v\n", err.Error())
 	}
 }

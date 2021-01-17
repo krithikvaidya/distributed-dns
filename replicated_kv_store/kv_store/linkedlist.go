@@ -46,6 +46,10 @@ func (ll *linkedlist) add(strA, strB string) {
 //Removes the corresponding key value pair
 func (ll *linkedlist) remove(str string) bool {
 	var newNode = ll.head
+	if ll.head == nil {
+		return false
+	}
+
 	if newNode.key == str {
 		ll.head = ll.head.next
 		ll.size--
