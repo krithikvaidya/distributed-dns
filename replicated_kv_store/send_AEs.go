@@ -190,6 +190,9 @@ func (node *RaftNode) HeartBeats() {
 
 		// send heartbeat
 		var entries []*protos.LogEntry
+		for i := int(prevLogIndex + 1); i < len(node.log); i++ {
+			entries = append(entries, &node.log[i])
+		}
 
 		hbeat_msg := &protos.AppendEntriesMessage{
 
