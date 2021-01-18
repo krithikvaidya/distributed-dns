@@ -42,19 +42,12 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 			//append to local log
 			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
 
-			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
-
-			var entries []*protos.LogEntry
-			entries = append(entries, &node.log[len(node.log)-1])
-
 			msg := &protos.AppendEntriesMessage{
 
 				Term:         node.currentTerm,
 				LeaderId:     node.replica_id,
-				PrevLogIndex: int32(len(node.log) - 1),
-				PrevLogTerm:  node.log[len(node.log)-1].Term,
 				LeaderCommit: node.commitIndex,
-				Entries:      entries,
+				LeaderAddr:   node.nodeAddress,
 			}
 
 			successful_write := make(chan bool)
@@ -145,25 +138,13 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 // StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come
 func (node *RaftNode) StaleReadCheck(write_success chan bool) {
-	replica_id := 0
-
-	var entries []*protos.LogEntry
-
-	prevLogIndex := node.nextIndex[replica_id] - 1
-	prevLogTerm := int32(-1)
-
-	if prevLogIndex >= 0 {
-		prevLogTerm = node.log[prevLogIndex].Term
-	}
 
 	hbeat_msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
 		LeaderId:     node.replica_id,
-		PrevLogIndex: prevLogIndex,
-		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
-		Entries:      entries,
+		LeaderAddr:   node.nodeAddress,
 	}
 
 	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), write_success)

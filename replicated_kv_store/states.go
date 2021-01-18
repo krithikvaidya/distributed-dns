@@ -70,30 +70,16 @@ func (node *RaftNode) ToLeader() {
 	// send no-op for synchronization
 	// first obtain prevLogIndex and prevLogTerm
 
-	prevLogIndex := int32(-1)
-	prevLogTerm := int32(-1)
-
-	if logLen := int32(len(node.log)); logLen > 0 {
-		prevLogIndex = logLen - 1
-		prevLogTerm = node.log[prevLogIndex].Term
-	}
-
 	var operation []string
 	operation = append(operation, "NO-OP")
 
 	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: " "})
 
-	var entries []*protos.LogEntry
-	entries = append(entries, &node.log[len(node.log)-1])
-
 	msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
 		LeaderId:     node.replica_id,
-		PrevLogIndex: prevLogIndex,
-		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
-		Entries:      entries,
 		LeaderAddr:   node.nodeAddress,
 	}
 
