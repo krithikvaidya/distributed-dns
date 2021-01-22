@@ -45,6 +45,8 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
 
+			node.latestClient = client
+
 			var entries []*protos.LogEntry
 			entries = append(entries, &node.log[len(node.log)-1])
 
@@ -56,6 +58,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 				PrevLogTerm:  node.log[len(node.log)-1].Term,
 				LeaderCommit: node.commitIndex,
 				Entries:      entries,
+				LatestClient: node.latestClient,
 			}
 
 			successful_write := make(chan bool)
@@ -165,6 +168,7 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 		PrevLogTerm:  prevLogTerm,
 		LeaderCommit: node.commitIndex,
 		Entries:      entries,
+		LatestClient: node.latestClient,
 	}
 
 	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), write_success)
