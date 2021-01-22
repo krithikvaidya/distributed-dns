@@ -130,6 +130,14 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			msg.PrevLogIndex = prevLogIndex
 			msg.PrevLogTerm = prevLogTerm
 
+			var entries []*protos.LogEntry
+
+			for i := int32(prevLogIndex + 1); i <= upper_index; i++ {
+				entries = append(entries, &node.log[i])
+			}
+
+			msg.Entries = entries
+
 			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
 
 				tot_success := atomic.AddInt32(&successes, 1)
@@ -180,26 +188,11 @@ func (node *RaftNode) HeartBeats() {
 			return
 		}
 
-		replica_id := node.replica_id
-
-		prevLogIndex := node.nextIndex[replica_id] - 1
-		prevLogTerm := int32(-1)
-
-		if prevLogIndex >= 0 {
-			prevLogTerm = node.log[prevLogIndex].Term
-		}
-
-		// send heartbeat
-		var entries []*protos.LogEntry
-
 		hbeat_msg := &protos.AppendEntriesMessage{
 
 			Term:         node.currentTerm,
 			LeaderId:     node.replica_id,
-			PrevLogIndex: prevLogIndex,
-			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
-			Entries:      entries,
 			LeaderAddr:   node.nodeAddress,
 			LatestClient: node.latestClient,
 		}
