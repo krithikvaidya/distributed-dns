@@ -31,6 +31,28 @@ func StartKVStore(addr string) {
 	r.HandleFunc("/{key}", kv.PutHandler).Methods("PUT")
 	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
 
+	/*[TODO]
+	 * Since this service is initiated independent of
+	 * the raft node service and the RaftNode struct, there
+	 * needs to be a mechanism to stop this service.
+	 *
+	 * The code for the mechanism is here but that requires access
+	 * to the RaftNode struct of the current node and this can
+	 * only be achieved by making this function receive the struct
+	 * as a parameter or making this function a part of the
+	 * RaftNode interface. This requires a bit of refactoring of the
+	 * code.
+	 */
+	// Create a server struct
+	/*kv_store_server := &http.Server {
+		Handler: r,
+		Addr: addr,
+	}
+
+	node.kv_store_server = kv_store_server
+
+	err = kv_store_server.ListenAndServe()*/
+
 	//Start the server and listen for requests. This is blocking.
 	err := http.ListenAndServe(addr, r)
 
@@ -51,8 +73,17 @@ func (node *RaftNode) StartRaftServer(addr string) {
 	r.HandleFunc("/{key}", node.PutHandler).Methods("PUT")
 	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
+	// Create a server struct
+	raft_server := &http.Server {
+		Handler: r,
+		Addr: addr,
+	}
+
+	node.raft_server = raft_server
+
 	//Start the server and listen for requests. This is blocking.
-	err := http.ListenAndServe(addr, r)
+	//err := http.ListenAndServe(addr, r)
+	err := raft_server.ListenAndServe()
 
 	CheckErrorFatal(err)
 
@@ -79,7 +110,7 @@ func init() {
 
 func main() {
 
-	log.Println("\nRaft-based Replicated Key Value Store\n")
+	log.Println("Raft-based Replicated Key Value Store")
 
 	log.Printf("Enter the replica's id: ")
 	var rid int
@@ -138,16 +169,16 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	CheckErrorFatal(err)
 
-	grpcServer := grpc.NewServer()
+	node.grpc_server = grpc.NewServer()
 
 	// ConsensusService is defined in protos/replica.proto./
 	// RegisterConsensusServiceServer is present in the generated .pb.go file
-	protos.RegisterConsensusServiceServer(grpcServer, node)
+	protos.RegisterConsensusServiceServer(node.grpc_server, node)
 
 	// gRPC Serve is blocking, so we do it on a separate goroutine
 	go func() {
 
-		err := grpcServer.Serve(listener)
+		err := node.grpc_server.Serve(listener)
 		CheckErrorFatal(err)
 
 		log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
