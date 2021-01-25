@@ -44,7 +44,10 @@ message AppendEntriesMessage {
     int32 leaderCommit = 5;
 
     repeated LogEntry entries = 6;
+
     string leaderAddr = 7;
+
+    string latestClient = 8;
 }
 
 message AppendEntriesResponse {

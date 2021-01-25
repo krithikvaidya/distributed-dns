@@ -46,6 +46,8 @@ type RaftNode struct {
 	log           []protos.LogEntry // The array of the log entry structs
 	leaderAddress string
 	nodeAddress   string
+	latestClient  string
+
 	// State to be maintained on all replicas (unpersisted)
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node

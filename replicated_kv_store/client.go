@@ -32,6 +32,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	//check if entry exists; if it does check if its the same as the one that was previously
 	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
+		equal = equal && client == node.latestClient
 	}
 
 	if !equal || !val { //if entry isnt the same OR if it doesn't exist
@@ -42,11 +43,19 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 			//append to local log
 			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
 
+			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
+
+			node.latestClient = client
+
+			var entries []*protos.LogEntry
+			entries = append(entries, &node.log[len(node.log)-1])
+
 			msg := &protos.AppendEntriesMessage{
 
 				Term:         node.currentTerm,
 				LeaderId:     node.replica_id,
 				LeaderCommit: node.commitIndex,
+				LatestClient: node.latestClient,
 				LeaderAddr:   node.nodeAddress,
 			}
 
@@ -144,6 +153,7 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 		Term:         node.currentTerm,
 		LeaderId:     node.replica_id,
 		LeaderCommit: node.commitIndex,
+		LatestClient: node.latestClient,
 		LeaderAddr:   node.nodeAddress,
 	}
 

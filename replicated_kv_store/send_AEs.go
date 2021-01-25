@@ -83,6 +83,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
 			LeaderAddr:   node.nodeAddress,
+			LatestClient: node.latestClient,
 		}
 
 		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
@@ -193,6 +194,7 @@ func (node *RaftNode) HeartBeats() {
 			LeaderId:     node.replica_id,
 			LeaderCommit: node.commitIndex,
 			LeaderAddr:   node.nodeAddress,
+			LatestClient: node.latestClient,
 		}
 
 		node.raft_node_mutex.RUnlock()

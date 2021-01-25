@@ -101,6 +101,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 		// of the message's entries. if entryIndex has reached the end, it means that there is nothing new to add to the candidate's log.
 		flag := false
 
+		trackMess := make(map[string][]string) // for storing the latest client operations
+
 		for ; entryIndex < len(in.Entries); entryIndex++ {
 
 			flag = true
@@ -117,7 +119,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
-			node.trackMessage[node.log[logIndex].Clientid] = node.log[logIndex].Operation //Updates the trackMessages for each client to the latest operation
+			trackMess[node.log[logIndex].Clientid] = node.log[logIndex].Operation 
 			logIndex++
 
 		}
@@ -132,6 +134,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			old_commit_index := node.commitIndex
 
 			log.Printf("\nin.LeaderCommit %v node.commitIndex %v int32(len(node.log)-1) %v\n", in.LeaderCommit, node.commitIndex, int32(len(node.log)-1))
+
+			node.latestClient = in.LatestClient // stores the id of the most recent client
+
+			for client, operation := range trackMess {
+				node.trackMessage[client] = operation //Updates the trackMessages for each client to the latest operation
+			}
 
 			if in.LeaderCommit < int32(len(node.log)-1) {
 
