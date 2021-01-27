@@ -23,7 +23,11 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	node.raft_node_mutex.RUnlock() // Lock was acquired in the respective calling Handler function in raft_server.go
 	node.raft_node_mutex.Lock()
 
-	// Perform operation only if leader
+	if node.state != Leader {
+		node.raft_node_mutex.Unlock()
+		return false, errors.New("\nNot a leader.\n")
+	}
+
 	var equal bool
 	var Err error
 
@@ -35,63 +39,69 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 		equal = equal && client == node.latestClient
 	}
 
-	if !equal || !val { //if entry isnt the same OR if it doesn't exist
-
-		// Perform operation only if leader
-		if node.state == Leader {
-
-			//append to local log
-			node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
-
-			// log.Printf("\nnode.log.operation: %v\n", node.log[len(node.log)-1].Operation)
-
-			node.latestClient = client
-
-			var entries []*protos.LogEntry
-			entries = append(entries, &node.log[len(node.log)-1])
-
-			msg := &protos.AppendEntriesMessage{
-
-				Term:         node.currentTerm,
-				LeaderId:     node.replica_id,
-				LeaderCommit: node.commitIndex,
-				LatestClient: node.latestClient,
-				LeaderAddr:   node.nodeAddress,
-			}
-
-			successful_write := make(chan bool)
-
-			node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
-
-			node.raft_node_mutex.Unlock()
-
-			success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
-
-			if success {
-
-				node.raft_node_mutex.Lock()
-				node.commitIndex++
-				node.raft_node_mutex.Unlock()
-				node.commits_ready <- 1
-
-				node.trackMessage[client] = operation
-			}
-
-			if !success {
-				Err = errors.New("Write operation failed. Write could not be replicated on majority of nodes.")
-			}
-
-			return success, Err
-		}
-	}
-
 	if equal {
 		Err = errors.New("Write operation failed. Already received identical write request from identical clientid.")
+		node.raft_node_mutex.Unlock()
+		return false, Err
 	}
 
-	// client had already asked us to perform this operation OR we're not a leader
+	// If it's a PUT or DELETE request, ensure that the resource exists.
+	if operation[0] == "PUT" || operation[0] == "DELETE" {
+
+		node.raft_node_mutex.Unlock()
+		node.raft_node_mutex.RLock()
+		response, err := node.ReadCommand(operation[1])
+
+		log.Printf("ok" + response + "ok")
+		log.Printf("%v", (response == "Invalid key value pair\n"))
+
+		if err == nil && response == "Invalid key value pair\n" {
+			prnt_str := fmt.Sprintf("\nUnable to perform %v request, no value exists for given key in the store.\n", operation[0])
+			return false, errors.New(prnt_str)
+		}
+
+		node.raft_node_mutex.Lock()
+	}
+
+	node.latestClient = client
+
+	var entries []*protos.LogEntry
+	entries = append(entries, &node.log[len(node.log)-1])
+
+	msg := &protos.AppendEntriesMessage{
+
+		Term:         node.currentTerm,
+		LeaderId:     node.replica_id,
+		LeaderCommit: node.commitIndex,
+		LatestClient: node.latestClient,
+		LeaderAddr:   node.nodeAddress,
+	}
+
+	//append to local log
+	node.log = append(node.log, protos.LogEntry{Term: node.currentTerm, Operation: operation, Clientid: client})
+
+	successful_write := make(chan bool)
+
+	node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
+
 	node.raft_node_mutex.Unlock()
-	return false, Err
+
+	success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
+
+	if success {
+
+		node.raft_node_mutex.Lock()
+		node.commitIndex++
+		node.raft_node_mutex.Unlock()
+		node.commits_ready <- 1
+
+		node.trackMessage[client] = operation
+
+	} else {
+		Err = errors.New("Write operation failed. Write could not be replicated on majority of nodes.")
+	}
+
+	return success, Err
 
 }
 
