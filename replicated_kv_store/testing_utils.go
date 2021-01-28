@@ -2,13 +2,11 @@ package main
 
 import (
 	"testing"
-	"net"
 	"sync"
 	"time"
 	"strconv"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
-	"google.golang.org/grpc"
 )
 
 type testing_st struct {
@@ -45,78 +43,23 @@ func make_testing_st(t *testing.T, n int) *testing_st {
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
-		new_test_st.setup_raft_node(i)
+		new_test_st.nodes[i] = setup_raft_node(i, new_test_st.n)
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i);
 	}
 
 	// Connect the replicas together to setup the system
 	for i := 0; i < n; i++ {
-		new_test_st.connect_raft_node(i)
+		status := new_test_st.nodes[i].connect_raft_node(i, new_test_st.rep_addrs, true)
+
+		if status == -1 {
+			t.Errorf("Node Initialization failure\n")
+		}
 
 		// Set the current node as active
 		new_test_st.active[i] = true
 	}
 
 	return new_test_st
-}
-
-/*
- * This function creates a raft node and imports the persistent
- * state information to the node.
- *
- * This function should only be run once, on the initial setup of the
- * testing system. It should not be run for restarting a node.
- */
-func (test_st *testing_st) setup_raft_node(id int) {
-	// Address of the current node
-	addr := ":300" + strconv.Itoa(id)
-
-	// Initialize node
-	test_st.nodes[id] = InitializeNode(int32(test_st.n), id, addr)
-
-	// Apply the persistent entries to the kv store
-	go test_st.nodes[id].ApplyToStateMachine()
-}
-
-/*
- * This function connects an existing node to a raft system.
- * 
- * It sets up each of the replicas, by using the
- * mechanism in the original code. This mechanism includes the
- * initiation of their various services, like the
- * KV store server, the gRPC server and the Raft server. The created
- * nodes are connected to each other as they are being created.
- */
-func (test_st *testing_st) connect_raft_node(id int) {
-	// Starting KV store
-	kvstore_addr := ":300" + strconv.Itoa(id)
-	go StartKVStore(kvstore_addr)
-
-	// Connect the new node to the existing nodes
-	test_st.nodes[id].ConnectToPeerReplicas(test_st.rep_addrs)
-
-	// Setting up and running the gRPC server
-	grpc_address := ":500" + strconv.Itoa(id)
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", grpc_address)
-	CheckErrorFatal(err)
-
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	CheckErrorFatal(err)
-
-	test_st.nodes[id].grpc_server = grpc.NewServer()
-
-	protos.RegisterConsensusServiceServer(test_st.nodes[id].grpc_server, test_st.nodes[id])
-
-	// Running the gRPC server
-	go func() {
-		err := test_st.nodes[id].grpc_server.Serve(listener)
-		CheckErrorFatal(err)
-	}()
-
-	// Set up the server for the Raft functionalities
-	server_address := ":400" + strconv.Itoa(id)
-	go test_st.nodes[id].StartRaftServer(server_address)
 }
 
 /*
@@ -134,14 +77,8 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	test_st.nodes[id].ready_chan<-false
 	test_st.active[id] = false
 
-	/*
-	 * [TODO]
-	 * Ideally, we need a way to stop the KV store service
-	 * when crashing a node. Since the server object is not being
-	 * stored in the RaftNode object. This is because this service
-	 * is started before the creation of the RaftNode struct.
-	 */
-	//test_st.nodes[id].kv_store_server.Stop()
+	// Stop the KV store service
+	test_st.nodes[id].kv_store_server.Close()
 
 	// Stop the raft service
 	test_st.nodes[id].raft_server.Close()
