@@ -13,18 +13,18 @@ const (
 	length = 101
 )
 
-type store struct {
+type Store struct {
 	db [length]*linkedlist
 	mu sync.RWMutex
 }
 
 //creates a new instance of key value store
-func NewStore() *store {
-	return &store{}
+func NewStore() *Store {
+	return &Store{}
 }
 
 //test handler
-func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *Store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	// if r.URL.Path != "/kvstore" {
 	// 	http.Error(w, "404 not found.", http.StatusNotFound)
@@ -40,7 +40,7 @@ func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all post requests
-func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *Store) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
 
@@ -76,7 +76,7 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all get requests
-func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *Store) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nGET request received\n")
 
@@ -104,7 +104,7 @@ func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all put requests
-func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *Store) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPUT request received\n")
 
@@ -139,7 +139,7 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //handles all delete requests
-func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+func (kv *Store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nDELETE request received\n")
 

@@ -20,10 +20,16 @@ import (
 var n_replica int
 
 // Start the local key-value store's HTTP server
-func StartKVStore(addr string) {
+func StartKVStore(filename string, addr string, kv *kv_store.Store) {
 
-	kv := kv_store.NewStore() // NewStore() defined in kv_store/restaccess_key_value.go
+	//kv := kv_store.NewStore() // NewStore() defined in kv_store/restaccess_key_value.go
 	r := mux.NewRouter()
+	if kv.HasData(filename) {
+		fmt.Println("\ngetting data stored in key value store")
+		kv.Recover(filename)
+	} else {
+		fmt.Println("\nNo persisted data found for key value store")
+	}
 
 	r.HandleFunc("/kvstore", kv.KvstoreHandler).Methods("GET")
 	r.HandleFunc("/{key}", kv.PostHandler).Methods("POST")
@@ -90,7 +96,9 @@ func main() {
 
 	log.Printf("\nStarting local key-value store...\n")
 
-	go StartKVStore(addresskeyvalue)
+	persistfile := "200" + strconv.Itoa(rid)
+	kv := kv_store.NewStore()
+	go StartKVStore(persistfile, addresskeyvalue, kv)
 
 	test_addr := fmt.Sprintf("http://localhost%s/kvstore", addresskeyvalue)
 
@@ -123,7 +131,7 @@ func main() {
 	// InitializeNode() is defined in raft_node.go
 	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
 
-	go node.ApplyToStateMachine() // ApplyToStateMachine defined in raft_node.go
+	go node.ApplyToStateMachine(kv, persistfile) // ApplyToStateMachine defined in raft_node.go
 
 	// Attempt to gRPC dial to other replicas + obtain corresponding client stubs.
 	// ConnectToPeerReplicas is defined in raft_node.go

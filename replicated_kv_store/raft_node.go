@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/kv_store"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
 )
@@ -60,7 +61,7 @@ type RaftNode struct {
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 
 	storage    *Storage // Used for Persistence
-	fileStored string   //Name of file where things are stored
+	fileStored string   // Name of file where things are stored
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
@@ -181,6 +182,13 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 	} else {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
+	if appliedidx, check := node.storage.Get("lastApplied", node.fileStored); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(appliedidx))
+		temp.Decode(&node.lastApplied)
+		node.commitIndex = node.lastApplied
+	} else {
+		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
+	}
 }
 
 func (node *RaftNode) persistToStorage() {
@@ -197,10 +205,13 @@ func (node *RaftNode) persistToStorage() {
 	gob.NewEncoder(&logentries).Encode(node.log)
 	node.storage.Set("log", logentries.Bytes(), node.fileStored)
 
+	var appliedidx bytes.Buffer
+	gob.NewEncoder(&appliedidx).Encode(node.lastApplied)
+	node.storage.Set("lastApplied", appliedidx.Bytes(), node.fileStored)
 }
 
 // Apply committed entries to our key-value store.
-func (node *RaftNode) ApplyToStateMachine() {
+func (node *RaftNode) ApplyToStateMachine(kv *kv_store.Store, persistfile string) {
 
 	for {
 
@@ -292,6 +303,8 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 		node.lastApplied = node.lastApplied + to_commit
 		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+		kv.Set(persistfile)
+		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 	}
 }

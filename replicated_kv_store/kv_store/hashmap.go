@@ -20,7 +20,7 @@ func hash(str string) int {
 }
 
 //Push is to create new key
-func (kv *store) Push(key, value string) {
+func (kv *Store) Push(key, value string) {
 	id := hash(key)
 	if kv.db[id] == nil {
 		kv.db[id] = newLinkedList()
@@ -29,7 +29,7 @@ func (kv *store) Push(key, value string) {
 }
 
 //Get is to return key
-func (kv *store) Get(key string) string {
+func (kv *Store) Get(key string) string {
 	id := hash(key)
 	if kv.db[id] == nil {
 		return "Invalid"
@@ -47,7 +47,7 @@ func (kv *store) Get(key string) string {
 }
 
 //Put is to update key
-func (kv *store) Put(key, value string) bool {
+func (kv *Store) Put(key, value string) bool {
 	id := hash(key)
 	if kv.db[id] == nil {
 		return false
@@ -66,7 +66,7 @@ func (kv *store) Put(key, value string) bool {
 }
 
 //Delete the key
-func (kv *store) Delete(key string) bool {
+func (kv *Store) Delete(key string) bool {
 	id := hash(key)
 	if kv.db[id] == nil {
 		return false
