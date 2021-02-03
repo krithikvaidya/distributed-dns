@@ -37,7 +37,7 @@ func (node *RaftNode) StartKVStore(addr string) {
 		Addr:    addr,
 	}
 
-	node_meta.kv_store_server = kv_store_server
+	node.node_meta.kv_store_server = kv_store_server
 
 	err := kv_store_server.ListenAndServe()
 
@@ -48,7 +48,7 @@ func (node *RaftNode) StartKVStore(addr string) {
 // Start a server to listen for client requests
 func (node *RaftNode) StartRaftServer(addr string) {
 
-	node_meta.nodeAddress = addr //store address of the node
+	node.node_meta.nodeAddress = addr //store address of the node
 
 	r := mux.NewRouter()
 
@@ -64,7 +64,7 @@ func (node *RaftNode) StartRaftServer(addr string) {
 		Addr:    addr,
 	}
 
-	node_meta.raft_server = raft_server
+	node.node_meta.raft_server = raft_server
 
 	//Start the server and listen for requests. This is blocking.
 	err := raft_server.ListenAndServe()
@@ -159,17 +159,17 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	CheckErrorFatal(err)
 
-	node_meta.grpc_server = grpc.NewServer()
+	node.node_meta.grpc_server = grpc.NewServer()
 
 	/*
 	 * ConsensusService is defined in protos/replica.proto./
 	 * RegisterConsensusServiceServer is present in the generated .pb.go file
 	 */
-	protos.RegisterConsensusServiceServer(node_meta.grpc_server, node)
+	protos.RegisterConsensusServiceServer(node.node_meta.grpc_server, node)
 
 	// Running the gRPC server
 	go func() {
-		err := node_meta.grpc_server.Serve(listener)
+		err := node.node_meta.grpc_server.Serve(listener)
 		CheckErrorFatal(err)
 		log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
 	}()

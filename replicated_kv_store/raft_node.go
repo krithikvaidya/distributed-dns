@@ -38,12 +38,12 @@ type NodeMetadata struct {
 
 }
 
-var node_meta *NodeMetadata
-
 // Main struct storing different aspects of the replica and it's state
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
+
+	node_meta *NodeMetadata
 
 	raft_node_mutex sync.RWMutex // The mutex for working with the RaftNode struct
 
@@ -93,7 +93,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		storage:       NewStorage(),
 	}
 
-	node_meta = &NodeMetadata{ // node_meta is a global variable
+	node_meta := &NodeMetadata{
 
 		n_replicas:           n_replica,
 		replica_id:           int32(rid),
@@ -103,7 +103,9 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		raft_persistence_file: keyvalue_port[1:],
 	}
 
-	if raft_node.storage.HasData(node_meta.raft_persistence_file) {
+	raft_node.node_meta = node_meta
+
+	if raft_node.storage.HasData(raft_node.node_meta.raft_persistence_file) {
 
 		raft_node.restoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
@@ -123,15 +125,15 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
 	// The clients for each corresponding server is stored in client_objs.
-	client_objs := make([]protos.ConsensusServiceClient, node_meta.n_replicas)
+	client_objs := make([]protos.ConsensusServiceClient, node.node_meta.n_replicas)
 
 	// NOTE: even if the grpc Dial to a given server fails the first time, the client stub can still be obtained.
 	// RPC requests using such client stubs will succeed when the connection can be established to
 	// the gRPC server.
 
-	for i := int32(0); i < node_meta.n_replicas; i++ {
+	for i := int32(0); i < node.node_meta.n_replicas; i++ {
 
-		if i == node_meta.replica_id {
+		if i == node.node_meta.replica_id {
 			continue
 		}
 
@@ -144,7 +146,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		client_objs[i] = cli
 	}
 
-	node_meta.peer_replica_clients = client_objs
+	node.node_meta.peer_replica_clients = client_objs
 
 	// Check what the persisted state was (if any), and accordingly proceed
 	node.raft_node_mutex.Lock()
@@ -176,19 +178,19 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {
-	if termvalue, check := node.storage.Get("currentTerm", node_meta.raft_persistence_file); check {
+	if termvalue, check := node.storage.Get("currentTerm", node.node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
 		temp.Decode(&node.currentTerm)
 	} else {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
-	if votedcheck, check := node.storage.Get("votedFor", node_meta.raft_persistence_file); check {
+	if votedcheck, check := node.storage.Get("votedFor", node.node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
 		temp.Decode(&node.votedFor)
 	} else {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
-	if logentries, check := node.storage.Get("log", node_meta.raft_persistence_file); check {
+	if logentries, check := node.storage.Get("log", node.node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
 		temp.Decode(&node.log)
 	} else {
@@ -200,15 +202,15 @@ func (node *RaftNode) persistToStorage() {
 
 	var termvalue bytes.Buffer
 	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
-	node.storage.Set("currentTerm", termvalue.Bytes(), node_meta.raft_persistence_file)
+	node.storage.Set("currentTerm", termvalue.Bytes(), node.node_meta.raft_persistence_file)
 
 	var votedcheck bytes.Buffer
 	gob.NewEncoder(&votedcheck).Encode(node.votedFor)
-	node.storage.Set("votedFor", votedcheck.Bytes(), node_meta.raft_persistence_file)
+	node.storage.Set("votedFor", votedcheck.Bytes(), node.node_meta.raft_persistence_file)
 
 	var logentries bytes.Buffer
 	gob.NewEncoder(&logentries).Encode(node.log)
-	node.storage.Set("log", logentries.Bytes(), node_meta.raft_persistence_file)
+	node.storage.Set("log", logentries.Bytes(), node.node_meta.raft_persistence_file)
 
 }
 
@@ -240,7 +242,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				url := fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1])
+				url := fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1])
 				resp, err := http.PostForm(url, formData)
 
 				if err != nil {
@@ -257,7 +259,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					node.raft_node_mutex.Unlock()
@@ -276,7 +278,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 			case "DELETE":
 
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1]), nil)
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					node.raft_node_mutex.Unlock()
