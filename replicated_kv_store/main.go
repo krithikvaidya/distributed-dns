@@ -20,9 +20,16 @@ import (
 var n_replica int
 
 // Start the local key-value store's HTTP server
-func (node *RaftNode) StartKVStore(addr string) {
+func (node *RaftNode) StartKVStore(addr string, num int) {
 
-	kv := kv_store.NewStore() // NewStore() defined in kv_store/restaccess_key_value.go
+	filename := "600" + strconv.Itoa(num)
+	kv := kv_store.NewStore(filename) // NewStore() defined in kv_store/restaccess_key_value.go
+	if kv.HasData() {
+		fmt.Print("\nloading kvstore data")
+		kv.Recover()
+	} else {
+		fmt.Print("\nNo persisted data in kvstore")
+	}
 	r := mux.NewRouter()
 
 	r.HandleFunc("/kvstore", kv.KvstoreHandler).Methods("GET")
@@ -122,7 +129,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
-	go node.StartKVStore(kvstore_addr)
+	go node.StartKVStore(kvstore_addr, id)
 
 	/*
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
