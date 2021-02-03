@@ -77,7 +77,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	// candidate.
 	node.electionResetEvent <- true
 
-	node.leaderAddress = in.LeaderAddr // gets the leaders address
+	node.node_meta.leaderAddress = in.LeaderAddr // gets the leaders address
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -133,7 +133,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			log.Printf("\nin.LeaderCommit %v node.commitIndex %v int32(len(node.log)-1) %v\n", in.LeaderCommit, node.commitIndex, int32(len(node.log)-1))
 
-			node.latestClient = in.LatestClient // stores the id of the most recent client
+			node.node_meta.latestClient = in.LatestClient // stores the id of the most recent client
 
 			for i := node.commitIndex + 1; i <= in.LeaderCommit && i < int32(len(node.log)); i++ {
 

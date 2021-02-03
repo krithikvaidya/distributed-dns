@@ -34,7 +34,7 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 
-		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.node_meta.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -74,7 +74,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.node_meta.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -111,7 +111,7 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n")
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.node_meta.leaderAddress+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -154,7 +154,7 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
-		fmt.Fprintf(w, "\nLast known leader's address: "+node.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.node_meta.leaderAddress+"\n") //sends leader address if its not the leader
 		node.raft_node_mutex.RUnlock()
 		return
 	}

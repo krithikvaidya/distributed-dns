@@ -37,7 +37,7 @@ func (node *RaftNode) ToCandidate() {
 
 	node.state = Candidate
 	node.currentTerm++
-	node.votedFor = node.replica_id
+	node.votedFor = node.node_meta.replica_id
 	node.persistToStorage()
 	//we can start an election for the candidate to become the leader
 	node.StartElection()
@@ -52,13 +52,13 @@ func (node *RaftNode) ToLeader() {
 
 	node.state = Leader
 
-	node.nextIndex = make([]int32, node.n_replicas, node.n_replicas)
-	node.matchIndex = make([]int32, node.n_replicas, node.n_replicas)
+	node.nextIndex = make([]int32, node.node_meta.n_replicas, node.node_meta.n_replicas)
+	node.matchIndex = make([]int32, node.node_meta.n_replicas, node.node_meta.n_replicas)
 
 	// initialize nextIndex, matchIndex
-	for replica_id := int32(0); replica_id < node.n_replicas; replica_id++ {
+	for replica_id := int32(0); replica_id < node.node_meta.n_replicas; replica_id++ {
 
-		if int32(replica_id) == node.replica_id {
+		if int32(replica_id) == node.node_meta.replica_id {
 			continue
 		}
 
@@ -78,10 +78,10 @@ func (node *RaftNode) ToLeader() {
 	msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.replica_id,
+		LeaderId:     node.node_meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LeaderAddr:   node.nodeAddress,
-		LatestClient: node.latestClient,
+		LeaderAddr:   node.node_meta.nodeAddress,
+		LatestClient: node.node_meta.latestClient,
 	}
 
 	node.persistToStorage()

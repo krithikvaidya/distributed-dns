@@ -20,7 +20,7 @@ import (
 var n_replica int
 
 // Start the local key-value store's HTTP server
-func StartKVStore(addr string) {
+func (node *RaftNode) StartKVStore(addr string) {
 
 	kv := kv_store.NewStore() // NewStore() defined in kv_store/restaccess_key_value.go
 	r := mux.NewRouter()
@@ -31,8 +31,15 @@ func StartKVStore(addr string) {
 	r.HandleFunc("/{key}", kv.PutHandler).Methods("PUT")
 	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
 
-	//Start the server and listen for requests. This is blocking.
-	err := http.ListenAndServe(addr, r)
+	// Create a server struct
+	kv_store_server := &http.Server{
+		Handler: r,
+		Addr:    addr,
+	}
+
+	node.node_meta.kv_store_server = kv_store_server
+
+	err := kv_store_server.ListenAndServe()
 
 	CheckErrorFatal(err)
 
@@ -41,7 +48,7 @@ func StartKVStore(addr string) {
 // Start a server to listen for client requests
 func (node *RaftNode) StartRaftServer(addr string) {
 
-	node.nodeAddress = addr //store address of the node
+	node.node_meta.nodeAddress = addr //store address of the node
 
 	r := mux.NewRouter()
 
@@ -51,8 +58,16 @@ func (node *RaftNode) StartRaftServer(addr string) {
 	r.HandleFunc("/{key}", node.PutHandler).Methods("PUT")
 	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
+	// Create a server struct
+	raft_server := &http.Server{
+		Handler: r,
+		Addr:    addr,
+	}
+
+	node.node_meta.raft_server = raft_server
+
 	//Start the server and listen for requests. This is blocking.
-	err := http.ListenAndServe(addr, r)
+	err := raft_server.ListenAndServe()
 
 	CheckErrorFatal(err)
 
@@ -77,60 +92,66 @@ func init() {
 
 }
 
-func main() {
+/*
+ * This function creates a raft node and imports the persistent
+ * state information to the node.
+ */
+func setup_raft_node(id int, n_replicas int) *RaftNode {
+	// Address of the current node
+	addr := ":300" + strconv.Itoa(id)
 
-	log.Println("\nRaft-based Replicated Key Value Store\n")
+	// Initialize node
+	node := InitializeNode(int32(n_replicas), id, addr)
 
-	log.Printf("Enter the replica's id: ")
-	var rid int
-	fmt.Scanf("%d", &rid)
+	// Apply the persistent entries to the kv store
+	go node.ApplyToStateMachine()
 
-	// Start the local key value store and wait for it to initialize
-	addresskeyvalue := ":300" + strconv.Itoa(rid) // kv-store will run at port :3000, :3001, ...
+	return node
+}
 
-	log.Printf("\nStarting local key-value store...\n")
+/*
+ * This function connects an existing node to a raft system.
+ *
+ * It connects the current node to the other nodes. This mechanism includes the
+ * initiation of their various services, like the
+ * KV store server, the gRPC server and the Raft server.
+ *
+ * Returns -1 in case of an error and 0 in the case of successful execution.
+ */
+func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool) int {
+	// Starting KV store
+	kvstore_addr := ":300" + strconv.Itoa(id)
+	log.Println("Starting local key-value store...")
+	go node.StartKVStore(kvstore_addr)
 
-	go StartKVStore(addresskeyvalue)
-
-	test_addr := fmt.Sprintf("http://localhost%s/kvstore", addresskeyvalue)
-
-	// make HTTP request to the test endpoint until a reply is obtained, indicating that
-	// the HTTP server is up
-	for {
-
-		_, err := http.Get(test_addr)
-
-		if err == nil {
-			log.Printf("\nKey-value store up and listening at port %s\n", addresskeyvalue)
-			break
+	/*
+	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
+	 * the HTTP server is up
+	 */
+	if !testing {
+		for {
+			test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
+			_, err := http.Get(test_addr)
+			if err == nil {
+				log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
+				break
+			} else {
+				log.Println("KV store server setup failed")
+				return -1
+			}
 		}
-
 	}
 
-	// Store the gRPC address of other replicas
-	rep_addrs := make([]string, n_replica)
-
-	for i := 0; i < n_replica; i++ {
-
-		if i == rid {
-			continue
-		}
-
-		rep_addrs[i] = ":500" + strconv.Itoa(i)
-
-	}
-
-	// InitializeNode() is defined in raft_node.go
-	node := InitializeNode(int32(n_replica), rid, addresskeyvalue)
-
-	go node.ApplyToStateMachine() // ApplyToStateMachine defined in raft_node.go
-
-	// Attempt to gRPC dial to other replicas + obtain corresponding client stubs.
-	// ConnectToPeerReplicas is defined in raft_node.go
-	log.Printf("\nObtaining client stubs of gRPC servers running at peer replicas...\n")
+	/*
+	 * Connect the new node to the existing nodes.
+	 * Attempt to gRPC dial to other replicas and obtain corresponding client stubs.
+	 * ConnectToPeerReplicas is defined in raft_node.go.
+	 */
+	log.Println("Obtaining client stubs of gRPC servers running at peer replicas...")
 	node.ConnectToPeerReplicas(rep_addrs)
 
-	grpc_address := ":500" + strconv.Itoa(rid) // gRPC server will run at port :2000, :2001, ...
+	// Setting up and running the gRPC server
+	grpc_address := ":500" + strconv.Itoa(id)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", grpc_address)
 	CheckErrorFatal(err)
@@ -138,45 +159,74 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	CheckErrorFatal(err)
 
-	grpcServer := grpc.NewServer()
+	node.node_meta.grpc_server = grpc.NewServer()
 
-	// ConsensusService is defined in protos/replica.proto./
-	// RegisterConsensusServiceServer is present in the generated .pb.go file
-	protos.RegisterConsensusServiceServer(grpcServer, node)
+	/*
+	 * ConsensusService is defined in protos/replica.proto./
+	 * RegisterConsensusServiceServer is present in the generated .pb.go file
+	 */
+	protos.RegisterConsensusServiceServer(node.node_meta.grpc_server, node)
 
-	// gRPC Serve is blocking, so we do it on a separate goroutine
+	// Running the gRPC server
 	go func() {
-
-		err := grpcServer.Serve(listener)
+		err := node.node_meta.grpc_server.Serve(listener)
 		CheckErrorFatal(err)
-
 		log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
-
 	}()
 
 	// TODO: wait till grpc server up
 
 	// Now we can start listening to client requests
-	// Start the raft replica server and wait for it to initialize
-	server_address := ":400" + strconv.Itoa(rid) // server for listening to client requests will run on port :4000, :4001, ....
+
+	// Set up the server for the Raft functionalities
+	server_address := ":400" + strconv.Itoa(id)
+	log.Println("Starting raft replica server...")
 	go node.StartRaftServer(server_address)
 
-	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
+	// Check whether the server is active
+	if !testing {
+		for {
+			test_addr := fmt.Sprintf("http://localhost%s/test", server_address)
+			_, err := http.Get(test_addr)
 
-	log.Printf("\nStarting raft replica server...\n")
-
-	for {
-
-		_, err := http.Get(test_addr)
-
-		if err == nil {
-			log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
-			break
+			if err == nil {
+				log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
+				break
+			} else {
+				log.Println("Raft server setup failed")
+				return -1
+			}
 		}
-
 	}
 
-	log.Printf("\nInitialization procedure completed.\n")
+	return 0
+}
+
+func main() {
+
+	log.Println("Raft-based Replicated Key Value Store")
+
+	log.Printf("Enter the replica's id: ")
+	var rid int
+	fmt.Scanf("%d", &rid)
+
+	node := setup_raft_node(rid, n_replica)
+
+	// Store the gRPC address of other replicas
+	rep_addrs := make([]string, n_replica)
+	for i := 0; i < n_replica; i++ {
+		if i == rid {
+			continue
+		}
+
+		rep_addrs[i] = ":500" + strconv.Itoa(i)
+	}
+
+	if node.connect_raft_node(rid, rep_addrs, false) == 0 {
+		log.Println("Node initialization procedure completed")
+	} else {
+		log.Println("Node initialization procedure failed")
+	}
 
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)
