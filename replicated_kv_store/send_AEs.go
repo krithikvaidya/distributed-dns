@@ -31,7 +31,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		// Obtain client stub
 		cli := protos.NewConsensusServiceClient(connxn)
 
-		node.peer_replica_clients[replica_id] = cli
+		node_meta.peer_replica_clients[replica_id] = cli
 
 		// Call the AppendEntries RPC for the given client
 		ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -77,13 +77,13 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		new_msg := &protos.AppendEntriesMessage{
 
 			Term:         node.currentTerm,
-			LeaderId:     node.replica_id,
+			LeaderId:     node_meta.replica_id,
 			PrevLogIndex: prevLogIndex,
 			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
-			LeaderAddr:   node.nodeAddress,
-			LatestClient: node.latestClient,
+			LeaderAddr:   node_meta.nodeAddress,
+			LatestClient: node_meta.latestClient,
 		}
 
 		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
@@ -109,9 +109,9 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	failures := int32(0)
 
-	for _, client_obj := range node.peer_replica_clients {
+	for _, client_obj := range node_meta.peer_replica_clients {
 
-		if replica_id == node.replica_id {
+		if replica_id == node_meta.replica_id {
 			replica_id++
 			continue
 		}
@@ -144,7 +144,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 				//log.Printf("Sending AE SUCCESS for replica %v\n", replica_id)
 
-				if tot_success == (node.n_replicas)/2+1 { // write quorum achieved
+				if tot_success == (node_meta.n_replicas)/2+1 { // write quorum achieved
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
 				}
 
@@ -153,7 +153,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
 
-				if tot_fail == (node.n_replicas+1)/2 {
+				if tot_fail == (node_meta.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
@@ -191,10 +191,10 @@ func (node *RaftNode) HeartBeats() {
 		hbeat_msg := &protos.AppendEntriesMessage{
 
 			Term:         node.currentTerm,
-			LeaderId:     node.replica_id,
+			LeaderId:     node_meta.replica_id,
 			LeaderCommit: node.commitIndex,
-			LeaderAddr:   node.nodeAddress,
-			LatestClient: node.latestClient,
+			LeaderAddr:   node_meta.nodeAddress,
+			LatestClient: node_meta.latestClient,
 		}
 
 		node.raft_node_mutex.RUnlock()

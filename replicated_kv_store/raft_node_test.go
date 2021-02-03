@@ -28,7 +28,7 @@ func TestInitializeNode(t *testing.T) {
 	// Here, we check every member of the RaftNode struct
 
 	// Check n_replicas
-	if node.n_replicas != no_of_replicas {
+	if node_meta.n_replicas != no_of_replicas {
 		t.Errorf("Invalid value for n_replicas, expected %v", no_of_replicas)
 	}
 
@@ -47,13 +47,13 @@ func TestInitializeNode(t *testing.T) {
 	}
 
 	// Check the value of `replica_id`
-	if node.replica_id != replica_id {
+	if node_meta.replica_id != replica_id {
 		t.Errorf("Invalid value for replica_id, expected %v", replica_id)
 	}
 
 	// Check the type of `peer_replica_clients`
 	var buf2 bytes.Buffer
-	fmt.Fprintf(&buf2, "%T", node.peer_replica_clients)
+	fmt.Fprintf(&buf2, "%T", node_meta.peer_replica_clients)
 	peer_replica_clients_type := buf2.String()
 
 	if peer_replica_clients_type != "[]protos.ConsensusServiceClient" {
@@ -104,7 +104,7 @@ func TestInitializeNode(t *testing.T) {
 	}
 
 	// Check the value of `kvstore_addr`
-	if node.kvstore_addr != ":8081" {
-		t.Errorf("Invalid value %v for kvstore_addr, expected :8081", node.kvstore_addr)
+	if node_meta.kvstore_addr != ":8081" {
+		t.Errorf("Invalid value %v for kvstore_addr, expected :8081", node_meta.kvstore_addr)
 	}
 }

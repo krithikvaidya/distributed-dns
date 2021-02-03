@@ -32,12 +32,12 @@ func (node *RaftNode) StartKVStore(addr string) {
 	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
 
 	// Create a server struct
-	kv_store_server := &http.Server {
+	kv_store_server := &http.Server{
 		Handler: r,
-		Addr: addr,
+		Addr:    addr,
 	}
 
-	node.kv_store_server = kv_store_server
+	node_meta.kv_store_server = kv_store_server
 
 	err := kv_store_server.ListenAndServe()
 
@@ -48,7 +48,7 @@ func (node *RaftNode) StartKVStore(addr string) {
 // Start a server to listen for client requests
 func (node *RaftNode) StartRaftServer(addr string) {
 
-	node.nodeAddress = addr //store address of the node
+	node_meta.nodeAddress = addr //store address of the node
 
 	r := mux.NewRouter()
 
@@ -59,12 +59,12 @@ func (node *RaftNode) StartRaftServer(addr string) {
 	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
 	// Create a server struct
-	raft_server := &http.Server {
+	raft_server := &http.Server{
 		Handler: r,
-		Addr: addr,
+		Addr:    addr,
 	}
 
-	node.raft_server = raft_server
+	node_meta.raft_server = raft_server
 
 	//Start the server and listen for requests. This is blocking.
 	err := raft_server.ListenAndServe()
@@ -96,7 +96,7 @@ func init() {
  * This function creates a raft node and imports the persistent
  * state information to the node.
  */
- func setup_raft_node(id int, n_replicas int) *RaftNode {
+func setup_raft_node(id int, n_replicas int) *RaftNode {
 	// Address of the current node
 	addr := ":300" + strconv.Itoa(id)
 
@@ -159,17 +159,17 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	CheckErrorFatal(err)
 
-	node.grpc_server = grpc.NewServer()
+	node_meta.grpc_server = grpc.NewServer()
 
 	/*
 	 * ConsensusService is defined in protos/replica.proto./
 	 * RegisterConsensusServiceServer is present in the generated .pb.go file
 	 */
-	protos.RegisterConsensusServiceServer(node.grpc_server, node)
+	protos.RegisterConsensusServiceServer(node_meta.grpc_server, node)
 
 	// Running the gRPC server
 	go func() {
-		err := node.grpc_server.Serve(listener)
+		err := node_meta.grpc_server.Serve(listener)
 		CheckErrorFatal(err)
 		log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
 	}()
@@ -199,7 +199,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 		}
 	}
 
-	return 0;
+	return 0
 }
 
 func main() {

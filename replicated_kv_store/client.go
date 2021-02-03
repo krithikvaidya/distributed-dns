@@ -36,7 +36,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	//check if entry exists; if it does check if its the same as the one that was previously
 	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
-		equal = equal && client == node.latestClient
+		equal = equal && client == node_meta.latestClient
 	}
 
 	if equal {
@@ -63,7 +63,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 		node.raft_node_mutex.Lock()
 	}
 
-	node.latestClient = client
+	node_meta.latestClient = client
 
 	var entries []*protos.LogEntry
 	entries = append(entries, &node.log[len(node.log)-1])
@@ -71,10 +71,10 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.replica_id,
+		LeaderId:     node_meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LatestClient: node.latestClient,
-		LeaderAddr:   node.nodeAddress,
+		LatestClient: node_meta.latestClient,
+		LeaderAddr:   node_meta.nodeAddress,
 	}
 
 	//append to local log
@@ -125,7 +125,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 		// assuming that if an operation on the state machine succeeds on one of the replicas,
 		// it will succeed on all. and vice versa.
-		url := fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, key)
+		url := fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, key)
 
 		resp, err := http.Get(url)
 
@@ -161,10 +161,10 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 	hbeat_msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.replica_id,
+		LeaderId:     node_meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LatestClient: node.latestClient,
-		LeaderAddr:   node.nodeAddress,
+		LatestClient: node_meta.latestClient,
+		LeaderAddr:   node_meta.nodeAddress,
 	}
 
 	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), write_success)

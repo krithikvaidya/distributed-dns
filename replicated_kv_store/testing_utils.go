@@ -1,24 +1,24 @@
 package main
 
 import (
-	"testing"
-	"sync"
-	"time"
 	"strconv"
+	"sync"
+	"testing"
+	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 type testing_st struct {
-	mu        sync.Mutex // The mutex for performing operations on the struct
-	t         *testing.T // The testing object for utility funcs to display errors
-	n         int // The number of nodes in the system
-	rep_addrs []string // The addresses of the replicas in the system
-	nodes     []*RaftNode // The RaftNode objects of the individual replicas
-	active    []bool // The status of each node, whether it is active(true) or not(false)
-	start     time.Time // Time at which make_testing_st() was called
+	mu         sync.Mutex  // The mutex for performing operations on the struct
+	t          *testing.T  // The testing object for utility funcs to display errors
+	n          int         // The number of nodes in the system
+	rep_addrs  []string    // The addresses of the replicas in the system
+	nodes      []*RaftNode // The RaftNode objects of the individual replicas
+	node_metas []*NodeMetadata
+	active     []bool    // The status of each node, whether it is active(true) or not(false)
+	start      time.Time // Time at which make_testing_st() was called
 }
-
 
 /*
  * This function is initially called in a test case for
@@ -38,13 +38,15 @@ func make_testing_st(t *testing.T, n int) *testing_st {
 	new_test_st.t = t
 	new_test_st.n = n
 	new_test_st.nodes = make([]*RaftNode, n)
+	new_test_st.node_metas = make([]*NodeMetadata, n)
 	new_test_st.active = make([]bool, n)
 	new_test_st.rep_addrs = make([]string, n)
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
 		new_test_st.nodes[i] = setup_raft_node(i, new_test_st.n)
-		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i);
+		new_test_st.node_metas[i] = node_meta
+		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
 	// Connect the replicas together to setup the system
@@ -72,19 +74,18 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	// Save the current status in persistent storage
 	test_st.nodes[id].persistToStorage()
 
-	// Kill the node by adding 'false' to RaftNode.ready_chan and
+	// Kill the node by
 	// making the node_active variable false
-	test_st.nodes[id].ready_chan<-false
 	test_st.active[id] = false
 
 	// Stop the KV store service
-	test_st.nodes[id].kv_store_server.Close()
+	// test_st.nodes[id].kv_store_server.Close()
 
 	// Stop the raft service
-	test_st.nodes[id].raft_server.Close()
+	// test_st.nodes[id].raft_server.Close()
 
 	// Stop the gRPC service
-	test_st.nodes[id].grpc_server.Stop()
+	// test_st.nodes[id].grpc_server.Stop()
 }
 
 /*
@@ -152,7 +153,7 @@ func (test_st *testing_st) check_consensus(index int) int {
 
 			// Check the entry at the current index against the other indexes
 			if logs[i].Term == logs[j].Term &&
-				len(logs[i].Operation) == len(logs[j].Operation) && 
+				len(logs[i].Operation) == len(logs[j].Operation) &&
 				logs[i].Clientid == logs[j].Clientid {
 				length := len(logs[i].Operation)
 				agree := true

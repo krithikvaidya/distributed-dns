@@ -22,62 +22,60 @@ const (
 	Down
 )
 
+// Store metadata related to the key value store and the raft node.
+type NodeMetadata struct {
+	n_replicas            int32                           // The number of replicas in the current replicated system
+	replica_id            int32                           // The unique ID for the current replica
+	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
+	grpc_server           *grpc.Server                    // The gRPC server object
+	raft_server           *http.Server                    // The HTTP server object for the Raft server
+	kv_store_server       *http.Server                    // The HTTP server object for the KV store server[TODO]
+	kvstore_addr          string                          // Stores the address of the local key value store
+	raft_persistence_file string                          // File where the log, currentTerm, votedFor, commitIndex and lastApplied are persisted
+	leaderAddress         string                          // Address of the last known leader
+	nodeAddress           string                          // Address of our node
+	latestClient          string                          // Address of client that made latest write request
+
+}
+
+var node_meta *NodeMetadata
+
 // Main struct storing different aspects of the replica and it's state
 // Refer to figure 2 in the paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 
-	ready_chan           chan bool                       // Channel to signal whether the node is ready for operation
-	n_replicas           int32                           // The number of replicas in the current replicated system
-	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
-	replica_id           int32                           // The unique ID for the current replica
-	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
-	grpc_server          *grpc.Server                    // The gRPC server object
-	raft_server          *http.Server                    // The HTTP server object for the Raft server
-	kv_store_server      *http.Server                    // The HTTP server object for the KV store server[TODO]
-	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
-	kvstore_addr         string                          // stores respective port on which local key value store is running
-	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
+	raft_node_mutex sync.RWMutex // The mutex for working with the RaftNode struct
 
 	trackMessage map[string][]string // tracks messages sent by clients
 
 	// States mentioned in figure 2 of the paper:
 
-	// State to be maintained on all replicas (TODO: persist)
-	currentTerm   int32             // Latest term server has seen
-	votedFor      int32             // Candidate ID of the node that received vote from current node in the latest term
-	log           []protos.LogEntry // The array of the log entry structs
-	leaderAddress string
-	nodeAddress   string
-	latestClient  string
+	// State to be maintained on all replicas
+	currentTerm int32             // Latest term server has seen
+	votedFor    int32             // Candidate ID of the node that received vote from current node in the latest term
+	log         []protos.LogEntry // The array of the log entry structs
 
-	// State to be maintained on all replicas (unpersisted)
+	// State to be maintained on all replicas
 	stopElectiontimer  chan bool     // Channel to signal for stopping the election timer for the node
 	electionResetEvent chan bool     // Channel to signal for resetting the election timer for the node
-	commitIndex        int32         // Index of the highest long entry known to be committed
-	lastApplied        int32         // Index of the highest log entry applied to the state machine
+	commitIndex        int32         // Index of the highest long entry known to be committed. Persisted.
+	lastApplied        int32         // Index of the highest log entry applied to the state machine. Persisted.
 	state              RaftNodeState // The current state of the node(eg. Candidate, Leader, etc)
 
 	// State to be maintained on the leader (unpersisted)
 	nextIndex  []int32 // Indices of the next log entry to send to each server
 	matchIndex []int32 // Indices of highest log entry known to be replicated on each server
 
-	storage    *Storage // Used for Persistence
-	fileStored string   //Name of file where things are stored
+	commits_ready chan int32 // Channel to signal the number of items commited once commit has been made to the log.
+	storage       *Storage   // Used for Persistence
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
-	rn := &RaftNode{
+	// Initializes RaftNode and NodeMetadata
 
-		n_replicas:           n_replica,
-		ready_chan:           make(chan bool),
-		replicas_ready:       0,
-		replica_id:           int32(rid),
-		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
-		state:                Follower, // all nodes are initialized as followers
-		kvstore_addr:         keyvalue_port,
-		commits_ready:        make(chan int32),
+	raft_node := &RaftNode{
 
 		trackMessage: make(map[string][]string),
 
@@ -87,17 +85,29 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 		stopElectiontimer:  make(chan bool),
 		electionResetEvent: make(chan bool),
-		commitIndex:        -1, // index of highest log entry known to be committed.
-		lastApplied:        -1, // index of highest log entry applied to state machine.
-		storage:            NewStorage(),
-		fileStored:         keyvalue_port[1:],
+		commitIndex:        -1,       // index of highest log entry known to be committed.
+		lastApplied:        -1,       // index of highest log entry applied to state machine.
+		state:              Follower, // all nodes are initialized as followers
+
+		commits_ready: make(chan int32),
+		storage:       NewStorage(),
 	}
 
-	if rn.storage.HasData(rn.fileStored) {
+	node_meta = &NodeMetadata{ // node_meta is a global variable
 
-		rn.restoreFromStorage(rn.storage)
+		n_replicas:           n_replica,
+		replica_id:           int32(rid),
+		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
+
+		kvstore_addr:          keyvalue_port,
+		raft_persistence_file: keyvalue_port[1:],
+	}
+
+	if raft_node.storage.HasData(node_meta.raft_persistence_file) {
+
+		raft_node.restoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
-		log.Printf("\nCurrent currentTerm: %v\nCurrent votedFor: %v\nCurrent log: %v\nCurrent log length: %v\n", rn.currentTerm, rn.votedFor, rn.log, len(rn.log))
+		log.Printf("\nCurrent currentTerm: %v\nCurrent votedFor: %v\nCurrent log: %v\nCurrent log length: %v\n", raft_node.currentTerm, raft_node.votedFor, raft_node.log, len(raft_node.log))
 
 	} else {
 
@@ -105,7 +115,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 
 	}
 
-	return rn
+	return raft_node
 
 }
 
@@ -113,15 +123,15 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
 	// The clients for each corresponding server is stored in client_objs.
-	client_objs := make([]protos.ConsensusServiceClient, node.n_replicas)
+	client_objs := make([]protos.ConsensusServiceClient, node_meta.n_replicas)
 
 	// NOTE: even if the grpc Dial to a given server fails the first time, the client stub can still be obtained.
 	// RPC requests using such client stubs will succeed when the connection can be established to
 	// the gRPC server.
 
-	for i := int32(0); i < node.n_replicas; i++ {
+	for i := int32(0); i < node_meta.n_replicas; i++ {
 
-		if i == node.replica_id {
+		if i == node_meta.replica_id {
 			continue
 		}
 
@@ -134,7 +144,7 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 		client_objs[i] = cli
 	}
 
-	node.peer_replica_clients = client_objs
+	node_meta.peer_replica_clients = client_objs
 
 	// Check what the persisted state was (if any), and accordingly proceed
 	node.raft_node_mutex.Lock()
@@ -166,19 +176,19 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {
-	if termvalue, check := node.storage.Get("currentTerm", node.fileStored); check {
+	if termvalue, check := node.storage.Get("currentTerm", node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
 		temp.Decode(&node.currentTerm)
 	} else {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
-	if votedcheck, check := node.storage.Get("votedFor", node.fileStored); check {
+	if votedcheck, check := node.storage.Get("votedFor", node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
 		temp.Decode(&node.votedFor)
 	} else {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
-	if logentries, check := node.storage.Get("log", node.fileStored); check {
+	if logentries, check := node.storage.Get("log", node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
 		temp.Decode(&node.log)
 	} else {
@@ -190,15 +200,15 @@ func (node *RaftNode) persistToStorage() {
 
 	var termvalue bytes.Buffer
 	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
-	node.storage.Set("currentTerm", termvalue.Bytes(), node.fileStored)
+	node.storage.Set("currentTerm", termvalue.Bytes(), node_meta.raft_persistence_file)
 
 	var votedcheck bytes.Buffer
 	gob.NewEncoder(&votedcheck).Encode(node.votedFor)
-	node.storage.Set("votedFor", votedcheck.Bytes(), node.fileStored)
+	node.storage.Set("votedFor", votedcheck.Bytes(), node_meta.raft_persistence_file)
 
 	var logentries bytes.Buffer
 	gob.NewEncoder(&logentries).Encode(node.log)
-	node.storage.Set("log", logentries.Bytes(), node.fileStored)
+	node.storage.Set("log", logentries.Bytes(), node_meta.raft_persistence_file)
 
 }
 
@@ -230,7 +240,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				url := fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1])
+				url := fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1])
 				resp, err := http.PostForm(url, formData)
 
 				if err != nil {
@@ -247,7 +257,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					node.raft_node_mutex.Unlock()
@@ -266,7 +276,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 			case "DELETE":
 
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.kvstore_addr, entry.Operation[1]), nil)
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node_meta.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					node.raft_node_mutex.Unlock()
