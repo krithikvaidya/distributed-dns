@@ -32,6 +32,9 @@ type RaftNode struct {
 	replicas_ready       int32                           // number of replicas that have connected to this replica's gRPC server.
 	replica_id           int32                           // The unique ID for the current replica
 	peer_replica_clients []protos.ConsensusServiceClient // client objects to send messages to other peers
+	grpc_server          *grpc.Server                    // The gRPC server object
+	raft_server          *http.Server                    // The HTTP server object for the Raft server
+	kv_store_server      *http.Server                    // The HTTP server object for the KV store server[TODO]
 	raft_node_mutex      sync.RWMutex                    // The mutex for working with the RaftNode struct
 	kvstore_addr         string                          // stores respective port on which local key value store is running
 	commits_ready        chan int32                      // Channel to signal the number of items commited once commit has been made to the log.
