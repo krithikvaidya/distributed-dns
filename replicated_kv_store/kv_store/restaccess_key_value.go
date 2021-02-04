@@ -14,13 +14,16 @@ const (
 )
 
 type store struct {
-	db [length]*linkedlist
-	mu sync.RWMutex
+	db       [length]*linkedlist
+	mu       sync.RWMutex
+	filename string
 }
 
 //creates a new instance of key value store
-func NewStore() *store {
-	return &store{}
+func NewStore(text string) *store {
+	return &store{
+		filename: text,
+	}
 }
 
 //test handler
@@ -73,6 +76,7 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kv.mu.Unlock()
+	kv.Persist()
 }
 
 //handles all get requests
@@ -136,6 +140,7 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kv.mu.Unlock()
+	kv.Persist()
 }
 
 //handles all delete requests
@@ -164,4 +169,5 @@ func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kv.mu.Unlock()
+	kv.Persist()
 }

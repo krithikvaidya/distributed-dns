@@ -152,6 +152,11 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 	node.raft_node_mutex.Lock()
 	defer node.raft_node_mutex.Unlock()
 
+	// suppose node dies before that series of commits have been applied then we want to finish it
+	if node.commitIndex > node.lastApplied {
+		node.commits_ready <- (node.commitIndex - node.lastApplied)
+	}
+
 	if node.state == Follower {
 
 		go node.RunElectionTimer() // RunElectionTimer defined in election.go
@@ -188,13 +193,25 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
 		temp.Decode(&node.votedFor)
 	} else {
-		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
+		log.Fatalf("\nFatal: persisted data found, but votedFor not found in storage\n")
 	}
 	if logentries, check := node.storage.Get("log", node.node_meta.raft_persistence_file); check {
 		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
 		temp.Decode(&node.log)
 	} else {
-		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
+		log.Fatalf("\nFatal: persisted data found, but log not found in storage\n")
+	}
+	if commitIdx, check := node.storage.Get("commitIndex", node.node_meta.raft_persistence_file); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(commitIdx))
+		temp.Decode(&node.commitIndex)
+	} else {
+		log.Fatalf("\nFatal: persisted data found, but commitIndex not found in storage\n")
+	}
+	if appliedIdx, check := node.storage.Get("lastApplied", node.node_meta.raft_persistence_file); check {
+		temp := gob.NewDecoder(bytes.NewBuffer(appliedIdx))
+		temp.Decode(&node.lastApplied)
+	} else {
+		log.Fatalf("\nFatal: persisted data found, but lastApplied not found in storage\n")
 	}
 }
 
@@ -212,6 +229,13 @@ func (node *RaftNode) persistToStorage() {
 	gob.NewEncoder(&logentries).Encode(node.log)
 	node.storage.Set("log", logentries.Bytes(), node.node_meta.raft_persistence_file)
 
+	var commitIdx bytes.Buffer
+	gob.NewEncoder(&commitIdx).Encode(node.commitIndex)
+	node.storage.Set("commitIndex", commitIdx.Bytes(), node.node_meta.raft_persistence_file)
+
+	var appliedIdx bytes.Buffer
+	gob.NewEncoder(&appliedIdx).Encode(node.lastApplied)
+	node.storage.Set("lastApplied", appliedIdx.Bytes(), node.node_meta.raft_persistence_file)
 }
 
 // Apply committed entries to our key-value store.
@@ -306,6 +330,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 		}
 
 		node.lastApplied = node.lastApplied + to_commit
+		node.persistToStorage()
 		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
 		node.raft_node_mutex.Unlock()
 	}
