@@ -18,7 +18,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	ctx, _ := context.WithTimeout(context.Background(), 40*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {

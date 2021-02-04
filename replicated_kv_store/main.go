@@ -23,13 +23,9 @@ var n_replica int
 func (node *RaftNode) StartKVStore(addr string, num int) {
 
 	filename := "600" + strconv.Itoa(num)
-	kv := kv_store.NewStore(filename) // NewStore() defined in kv_store/restaccess_key_value.go
-	if kv.HasData() {
-		fmt.Print("\nloading kvstore data")
-		kv.Recover()
-	} else {
-		fmt.Print("\nNo persisted data in kvstore")
-	}
+
+	kv := kv_store.InitializeStore(filename) // NewStore() defined in kv_store/restaccess_key_value.go
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/kvstore", kv.KvstoreHandler).Methods("GET")
@@ -104,11 +100,12 @@ func init() {
  * state information to the node.
  */
 func setup_raft_node(id int, n_replicas int) *RaftNode {
-	// Address of the current node
-	addr := ":300" + strconv.Itoa(id)
+
+	// Key value store address of the current node
+	kv_addr := ":300" + strconv.Itoa(id)
 
 	// Initialize node
-	node := InitializeNode(int32(n_replicas), id, addr)
+	node := InitializeNode(int32(n_replicas), id, kv_addr)
 
 	// Apply the persistent entries to the kv store
 	go node.ApplyToStateMachine()
@@ -126,6 +123,7 @@ func setup_raft_node(id int, n_replicas int) *RaftNode {
  * Returns -1 in case of an error and 0 in the case of successful execution.
  */
 func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool) int {
+
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
@@ -135,17 +133,19 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
 	 * the HTTP server is up
 	 */
+
+	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
+
 	if !testing {
 		for {
-			test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
+
 			_, err := http.Get(test_addr)
+
 			if err == nil {
 				log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
 				break
-			} else {
-				log.Println("KV store server setup failed")
-				return -1
 			}
+
 		}
 	}
 
@@ -190,19 +190,19 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	log.Println("Starting raft replica server...")
 	go node.StartRaftServer(server_address)
 
+	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
+
 	// Check whether the server is active
 	if !testing {
 		for {
-			test_addr := fmt.Sprintf("http://localhost%s/test", server_address)
-			_, err := http.Get(test_addr)
+
+			_, err = http.Get(test_addr)
 
 			if err == nil {
 				log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
 				break
-			} else {
-				log.Println("Raft server setup failed")
-				return -1
 			}
+
 		}
 	}
 

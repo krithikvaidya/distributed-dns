@@ -3,24 +3,29 @@ package main
 import (
 	"encoding/gob"
 	"fmt"
+	"log"
 	"os"
 	"sync"
+
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
-// Storage is a simple in-memory implementation of Storage for testing.
 type Storage struct {
 	mu sync.RWMutex
-	m  map[string][]byte
+	m  map[string]interface{}
 }
 
 func NewStorage() *Storage {
-	m := make(map[string][]byte)
+
+	gob.Register([]protos.LogEntry{})
+
+	m := make(map[string]interface{})
 	return &Storage{
 		m: m,
 	}
 }
 
-func (stored *Storage) writeFile(filename string) {
+func (stored *Storage) WriteFile(filename string) {
 	dataFile, err := os.Create(filename)
 
 	if err != nil {
@@ -31,12 +36,16 @@ func (stored *Storage) writeFile(filename string) {
 	// serialize the data
 	dataEncoder := gob.NewEncoder(dataFile)
 
-	dataEncoder.Encode(stored.m)
+	err = dataEncoder.Encode(stored.m)
+
+	if err != nil {
+		log.Printf("Error in WriteFile: %v", err.Error())
+	}
 
 	dataFile.Close()
 }
 
-func (stored *Storage) readFile(filename string) {
+func (stored *Storage) ReadFile(filename string) {
 	dataFile, err := os.Open(filename)
 
 	if err != nil {
@@ -56,20 +65,19 @@ func (stored *Storage) readFile(filename string) {
 	dataFile.Close()
 }
 
-func (stored *Storage) Get(key string, filename string) ([]byte, bool) {
+func (stored *Storage) Get(key string, filename string) (interface{}, bool) {
 
 	stored.mu.RLock()
 	defer stored.mu.RUnlock()
-	stored.readFile(filename)
+	stored.ReadFile(filename)
 	value, check := stored.m[key]
 	return value, check
 }
 
-func (stored *Storage) Set(key string, value []byte, filename string) {
+func (stored *Storage) Set(key string, value interface{}) {
 	stored.mu.Lock()
 	defer stored.mu.Unlock()
 	stored.m[key] = value
-	stored.writeFile(filename)
 }
 
 func (stored *Storage) HasData(filename string) bool {

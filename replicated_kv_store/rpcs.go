@@ -107,13 +107,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			if logIndex == len(node.log) {
 
 				// add new entry to log
-				log.Printf("\nadd new entry to logs\n")
+				log.Printf("\nAdd new entry to logs\n")
 				node.log = append(node.log, *in.Entries[entryIndex])
 
 			} else {
 
 				// overwrite invalidated log entry
-				log.Printf("\noverwrite invalidated log entry\n")
+				log.Printf("\nOverwrite invalidated log entry\n")
 				node.log[logIndex] = *in.Entries[entryIndex]
 
 			}
@@ -126,7 +126,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			node.persistToStorage()
 		}
 
-		//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 		if in.LeaderCommit > node.commitIndex {
 
 			old_commit_index := node.commitIndex

@@ -3,6 +3,7 @@ package kv_store
 import (
 	"encoding/gob"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -17,12 +18,14 @@ func (kv *store) writeFile() {
 	// serialize the data
 	dataEncoder := gob.NewEncoder(dataFile)
 
-	dataEncoder.Encode(kv.db)
+	err = dataEncoder.Encode(kv.db)
+	log.Printf(err.Error())
 
 	dataFile.Close()
 }
 
 func (kv *store) readFile() {
+
 	dataFile, err := os.Open(kv.filename)
 
 	if err != nil {
@@ -31,6 +34,7 @@ func (kv *store) readFile() {
 	}
 
 	dataDecoder := gob.NewDecoder(dataFile)
+	dataDecoder.Decode(&kv.db)
 
 	err = dataDecoder.Decode(&kv.db)
 
@@ -51,8 +55,6 @@ func (kv *store) Recover() {
 }
 
 func (kv *store) Persist() {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
 	kv.writeFile()
 }
 

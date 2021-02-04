@@ -34,14 +34,14 @@ func (kv *store) Get(key string) string {
 	if kv.db[id] == nil {
 		return "Invalid"
 	}
-	newNode := kv.db[id].head
+	newNode := kv.db[id].Head
 	for {
 		if newNode == nil {
 			break
-		} else if newNode.key == key {
-			return newNode.data
+		} else if newNode.Key == key {
+			return newNode.Data
 		}
-		newNode = newNode.next
+		newNode = newNode.Next
 	}
 	return "Invalid"
 }
@@ -52,15 +52,15 @@ func (kv *store) Put(key, value string) bool {
 	if kv.db[id] == nil {
 		return false
 	}
-	newNode := kv.db[id].head
+	newNode := kv.db[id].Head
 	for {
 		if newNode == nil {
 			break
-		} else if newNode.key == key {
-			newNode.data = value
+		} else if newNode.Key == key {
+			newNode.Data = value
 			return true
 		}
-		newNode = newNode.next
+		newNode = newNode.Next
 	}
 	return false
 }

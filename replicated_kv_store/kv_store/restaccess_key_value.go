@@ -1,6 +1,7 @@
 package kv_store
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,30 +15,29 @@ const (
 )
 
 type store struct {
-	db       [length]*linkedlist
+	db       [length]*Linkedlist
 	mu       sync.RWMutex
 	filename string
 }
 
 //creates a new instance of key value store
-func NewStore(text string) *store {
-	return &store{
+func InitializeStore(text string) *store {
+
+	gob.Register([]*Linkedlist{})
+
+	kv := &store{
 		filename: text,
 	}
+
+	if kv.HasData() {
+		kv.Recover()
+	}
+
+	return kv
 }
 
 //test handler
 func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
-
-	// if r.URL.Path != "/kvstore" {
-	// 	http.Error(w, "404 not found.", http.StatusNotFound)
-	// 	return
-	// }
-
-	// if r.Method != "GET" {
-	// 	http.Error(w, "Method is not supported.", http.StatusNotFound)
-	// 	return
-	// }
 
 	fmt.Fprintf(w, "KEY VALUE STORE !!!")
 }
@@ -46,11 +46,6 @@ func (kv *store) KvstoreHandler(w http.ResponseWriter, r *http.Request) {
 func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
-
-	// if r.Method != "POST" {
-	// http.Error(w, "Method is not supported.", http.StatusNotFound)
-	// return
-	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -75,19 +70,14 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "This key already exists")
 	}
 
-	kv.mu.Unlock()
 	kv.Persist()
+	kv.mu.Unlock()
 }
 
 //handles all get requests
 func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nGET request received\n")
-
-	// if r.Method != "GET" {
-	// http.Error(w, "Method is not supported.", http.StatusNotFound)
-	// return
-	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -112,11 +102,6 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPUT request received\n")
 
-	// if r.Method != "PUT" {
-	// http.Error(w, "Method is not supported.", http.StatusNotFound)
-	// return
-	// }
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 
@@ -139,19 +124,14 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Invalid key value pair\n")
 	}
 
-	kv.mu.Unlock()
 	kv.Persist()
+	kv.mu.Unlock()
 }
 
 //handles all delete requests
 func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nDELETE request received\n")
-
-	// if r.Method != "DELETE" {
-	// http.Error(w, "Method is not supported.", http.StatusNotFound)
-	// return
-	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -168,6 +148,6 @@ func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Invalid key value pair\n")
 	}
 
-	kv.mu.Unlock()
 	kv.Persist()
+	kv.mu.Unlock()
 }

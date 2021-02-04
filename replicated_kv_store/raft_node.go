@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -71,7 +70,7 @@ type RaftNode struct {
 	storage       *Storage   // Used for Persistence
 }
 
-func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
+func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 	// Initializes RaftNode and NodeMetadata
 
@@ -99,8 +98,8 @@ func InitializeNode(n_replica int32, rid int, keyvalue_port string) *RaftNode {
 		replica_id:           int32(rid),
 		peer_replica_clients: make([]protos.ConsensusServiceClient, n_replica),
 
-		kvstore_addr:          keyvalue_port,
-		raft_persistence_file: keyvalue_port[1:],
+		kvstore_addr:          keyvalue_addr,
+		raft_persistence_file: keyvalue_addr[1:],
 	}
 
 	raft_node.node_meta = node_meta
@@ -183,59 +182,52 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 }
 
 func (node *RaftNode) restoreFromStorage(storage *Storage) {
-	if termvalue, check := node.storage.Get("currentTerm", node.node_meta.raft_persistence_file); check {
-		temp := gob.NewDecoder(bytes.NewBuffer(termvalue))
-		temp.Decode(&node.currentTerm)
-	} else {
+
+	var check bool
+
+	var t1, t2, t3, t4, t5 interface{}
+
+	if t1, check = node.storage.Get("currentTerm", node.node_meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
-	if votedcheck, check := node.storage.Get("votedFor", node.node_meta.raft_persistence_file); check {
-		temp := gob.NewDecoder(bytes.NewBuffer(votedcheck))
-		temp.Decode(&node.votedFor)
-	} else {
+
+	node.currentTerm = t1.(int32)
+
+	if t2, check = node.storage.Get("votedFor", node.node_meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but votedFor not found in storage\n")
 	}
-	if logentries, check := node.storage.Get("log", node.node_meta.raft_persistence_file); check {
-		temp := gob.NewDecoder(bytes.NewBuffer(logentries))
-		temp.Decode(&node.log)
-	} else {
+
+	node.votedFor = t2.(int32)
+
+	if t3, check = node.storage.Get("log", node.node_meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but log not found in storage\n")
 	}
-	if commitIdx, check := node.storage.Get("commitIndex", node.node_meta.raft_persistence_file); check {
-		temp := gob.NewDecoder(bytes.NewBuffer(commitIdx))
-		temp.Decode(&node.commitIndex)
-	} else {
+
+	node.log = t3.([]protos.LogEntry)
+
+	if t4, check = node.storage.Get("commitIndex", node.node_meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but commitIndex not found in storage\n")
 	}
-	if appliedIdx, check := node.storage.Get("lastApplied", node.node_meta.raft_persistence_file); check {
-		temp := gob.NewDecoder(bytes.NewBuffer(appliedIdx))
-		temp.Decode(&node.lastApplied)
-	} else {
+
+	node.commitIndex = t4.(int32)
+
+	if t5, check = node.storage.Get("lastApplied", node.node_meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but lastApplied not found in storage\n")
 	}
+
+	node.lastApplied = t5.(int32)
 }
 
 func (node *RaftNode) persistToStorage() {
 
-	var termvalue bytes.Buffer
-	gob.NewEncoder(&termvalue).Encode(node.currentTerm)
-	node.storage.Set("currentTerm", termvalue.Bytes(), node.node_meta.raft_persistence_file)
+	node.storage.Set("currentTerm", node.currentTerm)
+	node.storage.Set("votedFor", node.votedFor)
+	node.storage.Set("log", node.log)
+	node.storage.Set("commitIndex", node.commitIndex)
+	node.storage.Set("lastApplied", node.lastApplied)
 
-	var votedcheck bytes.Buffer
-	gob.NewEncoder(&votedcheck).Encode(node.votedFor)
-	node.storage.Set("votedFor", votedcheck.Bytes(), node.node_meta.raft_persistence_file)
+	node.storage.WriteFile(node.node_meta.raft_persistence_file)
 
-	var logentries bytes.Buffer
-	gob.NewEncoder(&logentries).Encode(node.log)
-	node.storage.Set("log", logentries.Bytes(), node.node_meta.raft_persistence_file)
-
-	var commitIdx bytes.Buffer
-	gob.NewEncoder(&commitIdx).Encode(node.commitIndex)
-	node.storage.Set("commitIndex", commitIdx.Bytes(), node.node_meta.raft_persistence_file)
-
-	var appliedIdx bytes.Buffer
-	gob.NewEncoder(&appliedIdx).Encode(node.lastApplied)
-	node.storage.Set("lastApplied", appliedIdx.Bytes(), node.node_meta.raft_persistence_file)
 }
 
 // Apply committed entries to our key-value store.

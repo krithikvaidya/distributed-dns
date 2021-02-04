@@ -92,6 +92,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 		node.raft_node_mutex.Lock()
 		node.commitIndex++
+		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 		node.commits_ready <- 1
 
