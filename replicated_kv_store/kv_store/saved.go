@@ -3,11 +3,11 @@ package kv_store
 import (
 	"encoding/gob"
 	"fmt"
-	"log"
 	"os"
 )
 
 func (kv *store) writeFile() {
+
 	dataFile, err := os.Create(kv.filename)
 
 	if err != nil {
@@ -18,8 +18,12 @@ func (kv *store) writeFile() {
 	// serialize the data
 	dataEncoder := gob.NewEncoder(dataFile)
 
-	err = dataEncoder.Encode(kv.db)
-	log.Printf(err.Error())
+	// CHECK: why is "runtime error: invalid memory address or nil pointer dereference"
+	// happening here everytime the Encode happens, even though the write actually succeeds
+	// err = dataEncoder.Encode(kv.db_temp)
+	// log.Printf("Error in encoding data: %v", err.Error())
+
+	dataEncoder.Encode(kv.db_temp)
 
 	dataFile.Close()
 }
@@ -34,9 +38,8 @@ func (kv *store) readFile() {
 	}
 
 	dataDecoder := gob.NewDecoder(dataFile)
-	dataDecoder.Decode(&kv.db)
 
-	err = dataDecoder.Decode(&kv.db)
+	err = dataDecoder.Decode(&kv.db_temp)
 
 	if err != nil {
 		fmt.Println(err)
@@ -44,6 +47,14 @@ func (kv *store) readFile() {
 	}
 
 	dataFile.Close()
+
+	for key, value := range kv.db_temp {
+
+		if value != "" {
+			kv.Push(key, value)
+		}
+
+	}
 }
 
 func (kv *store) Recover() {

@@ -21,7 +21,7 @@ func newLinkedList() *Linkedlist {
 	}
 }
 
-//Check is list is empty
+//Check if list is empty
 func (ll *Linkedlist) isEmpty() bool {
 	if ll.Head == nil {
 		return true

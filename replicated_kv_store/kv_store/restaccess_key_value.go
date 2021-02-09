@@ -1,7 +1,6 @@
 package kv_store
 
 import (
-	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,15 +17,15 @@ type store struct {
 	db       [length]*Linkedlist
 	mu       sync.RWMutex
 	filename string
+	db_temp  map[string]string
 }
 
 //creates a new instance of key value store
 func InitializeStore(text string) *store {
 
-	gob.Register([]*Linkedlist{})
-
 	kv := &store{
 		filename: text,
+		db_temp:  make(map[string]string),
 	}
 
 	if kv.HasData() {
@@ -66,6 +65,7 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Key = %s\n", key)
 		fmt.Fprintf(w, "Value = %s\n", value)
 		kv.Push(key, value)
+		kv.db_temp[key] = value
 	} else {
 		fmt.Fprintf(w, "This key already exists")
 	}
@@ -120,6 +120,7 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 	if ok == true {
 		fmt.Fprintf(w, "Key = %s\n", key)
 		fmt.Fprintf(w, "Value = %s\n", value)
+		kv.db_temp[key] = value
 	} else {
 		fmt.Fprintf(w, "Invalid key value pair\n")
 	}
@@ -144,6 +145,7 @@ func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	if ok == true {
 		fmt.Fprintf(w, "Removed Key = %s\n", key)
+		kv.db_temp[key] = ""
 	} else {
 		fmt.Fprintf(w, "Invalid key value pair\n")
 	}

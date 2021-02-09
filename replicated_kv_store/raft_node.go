@@ -263,8 +263,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 				if err != nil {
 					log.Printf("\nError in client.Do(req): %v\n", err)
-					node.raft_node_mutex.Unlock()
-					break
+					continue
 				}
 
 				resp.Body.Close()
@@ -278,16 +277,14 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					node.raft_node_mutex.Unlock()
-					break
+					continue
 				}
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					node.raft_node_mutex.Unlock()
-					break
+					continue
 				}
 
 				resp.Body.Close()
@@ -297,16 +294,14 @@ func (node *RaftNode) ApplyToStateMachine() {
 				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
-					node.raft_node_mutex.Unlock()
-					break
+					continue
 				}
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded;")
 
 				resp, err := client.Do(req)
 				if err != nil {
 					log.Printf("\nError in client.Do: %v\n", err)
-					node.raft_node_mutex.Unlock()
-					break
+					continue
 				}
 
 				resp.Body.Close()
