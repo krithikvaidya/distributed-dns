@@ -10,7 +10,7 @@
 
 - On each terminal, run ```go run . -n <number_of_replicas>``` and follow the on screen instructions.
 
-- For running tests, use ```go test```.
+- For running tests, use ```go test```. Preferably use ```go test -p 1``` to prevent parallel execution.
 
 - #### Making requests from the client:
 
@@ -23,7 +23,7 @@ GET request : ```curl -X GET  http://localhost:xyzw/<key>```<br>
 PUT request : ```curl -d "value=<value>&client=<id>" -X PUT http://localhost:xyzw/<key>```<br>
 DELETE request : ```curl -X DELETE  http://localhost:xyzw/<key>```<br>
 
-### Instructions for writing new test cases:
+### General instructions for testing:
 
 - A **test file** is a single file with a collection of **test cases**.
 
@@ -37,8 +37,18 @@ DELETE request : ```curl -X DELETE  http://localhost:xyzw/<key>```<br>
 
 - `t.Log()` can be used to provide debug information.
 
-- Check the test case written in the file `raft_node_test.go` for reference.
-
-- For keeping tests organized, it is preferable to have one test file per source file. For example, all the tests related to the functions in `raft_node.go` should be written in the test file `raft_node_test.go`.
+- Check the test cases written in the file `raft_test.go` for reference.
 
 - Please write proper documentation for the tests, describing what feature it tests and how it manages to do so. This can be written in a comment block before the corresponding test case function.
+
+### How to write new test cases:
+
+- The functions in the file `testing_utils.go`, should contain the necessary functions needed for testing, for example, functions for setting up a Raft system, crashing a single node, destroying the whole system, counting number of leaders, etc.
+
+- Always start a test by calling the `start_test()` function which should return a pointer to the testing struct of type `testing_st`. The parameters to `start_test` are the `t *testing.T` object and the number of nodes that should exist in the Raft system to be created.
+
+- `testing_st` is a struct that needs to be created for every test case. This will hold the `RaftNode` structs and other data related to individual nodes so that a global view of the system is available.
+
+- Perform operations on the testing system and check its status using the functions in `testing_utils.go`.
+
+- End the test case by using `end_test()` and passing the testing system to it as a parameter.
