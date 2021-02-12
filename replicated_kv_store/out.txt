@@ -1,0 +1,17 @@
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+Restored Persisted Data:
+
+Current currentTerm: 812
+Current votedFor: 0
+Current log: []
+Current log length: 0
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4000
+Node initialization procedure completed

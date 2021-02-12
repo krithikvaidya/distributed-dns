@@ -19,10 +19,12 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 
-curl -L "https://docs.google.com/uc?export=download&id=1t3yrnTErOzdB5IVUxb91MJGAPlBxkciR" --output ec2_startup2.sh
+export REPLICA_ID=0
+export REP_0_GRPC_ADDR=:5555
+export REP_1_GRPC_ADDR=:5556
+export REP_2_GRPC_ADDR=:5557
 
-chmod 777 ec2_startup2.sh
-
-su ubuntu -s ./ec2_startup2.sh
+cd /home/ubuntu/workspace/replicated_kv_store
+./replicated_kv_store -n 3
 
 --//

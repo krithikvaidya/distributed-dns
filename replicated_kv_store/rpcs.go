@@ -151,7 +151,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			}
 
-			start := time.now()
+			start := time.Now()
 			node.persistToStorage()
 			log.Printf("\nPersisting raft state to storage took time %v", time.Since(start))
 
