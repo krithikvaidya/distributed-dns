@@ -18,7 +18,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	ctx, _ := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
@@ -103,6 +103,8 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 // Leader sending AppendEntries to all other replicas.
 func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int32, successful_write chan bool) {
 
+	start := time.Now()
+
 	replica_id := int32(0)
 
 	successes := int32(1)
@@ -116,7 +118,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
-		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
+		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool, start time.Time) {
 
 			node.raft_node_mutex.Lock()
 			//log.Printf("Lock on %d", replica_id)
@@ -145,6 +147,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 				//log.Printf("Sending AE SUCCESS for replica %v\n", replica_id)
 
 				if tot_success == (node.node_meta.n_replicas)/2+1 { // write quorum achieved
+					log.Printf("Successfully achieved write quorum in %v", time.Since(start))
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
 				}
 
@@ -154,6 +157,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
 
 				if tot_fail == (node.node_meta.n_replicas+1)/2 {
+					log.Printf("Failed to achieve write quorum, time elapsed: %v", time.Since(start))
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
@@ -161,7 +165,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			node.raft_node_mutex.Unlock()
 			//log.Printf("Unlock on %d", replica_id)
 
-		}(node, client_obj, replica_id, upper_index, successful_write)
+		}(node, client_obj, replica_id, upper_index, successful_write, start)
 
 		replica_id++
 
@@ -173,7 +177,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats() {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {

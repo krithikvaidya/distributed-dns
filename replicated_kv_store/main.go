@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -213,9 +214,9 @@ func main() {
 
 	log.Println("Raft-based Replicated Key Value Store")
 
-	log.Printf("Enter the replica's id: ")
-	var rid int
-	fmt.Scanf("%d", &rid)
+	// Get replica id from env variable
+	rid, _ := strconv.Atoi(os.Getenv("REPLICA_ID"))
+	log.Printf("Replica ID = %v\n", rid)
 
 	node := setup_raft_node(rid, n_replica)
 
@@ -226,7 +227,8 @@ func main() {
 			continue
 		}
 
-		rep_addrs[i] = ":500" + strconv.Itoa(i)
+		rep_i_addr := "REP_" + strconv.Itoa(i) + "_GRPC_ADDR"
+		rep_addrs[i] = os.Getenv(rep_i_addr)
 	}
 
 	if node.connect_raft_node(rid, rep_addrs, false) == 0 {
