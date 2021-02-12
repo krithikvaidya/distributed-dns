@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 sudo apt update
@@ -24,5 +25,4 @@ export PATH=$GOROOT/bin:$PATH
 export GOPATH=/home/ubuntu/go
 export PATH=$GOPATH/bin:$PATH
 
-cd ~/workspace/replicated_kv_store
 go build
