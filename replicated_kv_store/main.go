@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"context"
 
 	"github.com/gorilla/mux"
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/kv_store"
@@ -20,7 +21,10 @@ import (
 var n_replica int
 
 // Start the local key-value store's HTTP server
-func (node *RaftNode) StartKVStore(addr string, num int) {
+func (node *RaftNode) StartKVStore(parent_ctx context.Context, addr string, num int) {
+	// Creating a context for the key value store handler thread
+	ctx, cancel := context.WithCancel(parent_ctx)
+	defer cancel()
 
 	filename := "600" + strconv.Itoa(num)
 
@@ -35,21 +39,59 @@ func (node *RaftNode) StartKVStore(addr string, num int) {
 	r.HandleFunc("/{key}", kv.DeleteHandler).Methods("DELETE")
 
 	// Create a server struct
-	kv_store_server := &http.Server{
+	srv := &http.Server {
 		Handler: r,
-		Addr:    addr,
+		Addr: addr,
+	}
+
+	kv_store_server := &HttpServer {
+		srv: srv,
+		close_chan: make(chan bool),
 	}
 
 	node.node_meta.kv_store_server = kv_store_server
 
-	err := kv_store_server.ListenAndServe()
+	// Gracefully shut down the server if context is cancelled
+	go func() {
+		// Block till context is cancelled
+		<-ctx.Done()
 
-	CheckErrorFatal(err)
+		// Shut down the server, on error, forcefully close the server
+		if err_kv := node.node_meta.kv_store_server.srv.Shutdown(context.Background()); err_kv != nil {
+			log.Printf("HTTP server Shutdown error: %v", err_kv)
+			node.node_meta.kv_store_server.srv.Close()
+		}
 
+		node.node_meta.kv_store_server.close_chan<-true
+	}()
+
+	err := node.node_meta.kv_store_server.srv.ListenAndServe()
+
+	// Handling code when the server is gracefully or forcefully shut down
+	if err == http.ErrServerClosed {
+		<-node.node_meta.kv_store_server.close_chan
+	} else if err != nil {
+		CheckErrorFatal(err)
+	}
+}
+
+/*
+ * External function to gracefully shut down the kv store server
+ */
+ func (node *RaftNode) StopKVStore() {
+	// Stop the KV store service
+	if err_kv := node.node_meta.kv_store_server.srv.Shutdown(context.Background()); err_kv != nil {
+		log.Printf("HTTP server Shutdown error: %v", err_kv)
+	}
+
+	node.node_meta.kv_store_server.close_chan<-true
 }
 
 // Start a server to listen for client requests
-func (node *RaftNode) StartRaftServer(addr string) {
+func (node *RaftNode) StartRaftServer(parent_ctx context.Context, addr string) {
+	// Creating a context for the raft server handler thread
+	ctx, cancel := context.WithCancel(parent_ctx)
+	defer cancel()
 
 	node.node_meta.nodeAddress = addr //store address of the node
 
@@ -62,18 +104,75 @@ func (node *RaftNode) StartRaftServer(addr string) {
 	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
 	// Create a server struct
-	raft_server := &http.Server{
+	srv := &http.Server {
 		Handler: r,
 		Addr:    addr,
 	}
 
+	raft_server := &HttpServer {
+		srv: srv,
+		close_chan: make(chan bool),
+	}
+
 	node.node_meta.raft_server = raft_server
 
-	//Start the server and listen for requests. This is blocking.
-	err := raft_server.ListenAndServe()
+	// Gracefully shut down the server if context is cancelled
+	go func() {
+		// Block till context is cancelled
+		<-ctx.Done()
 
+		// Shut down the server, on error, forcefully close the server
+		if err_kv := node.node_meta.raft_server.srv.Shutdown(context.Background()); err_kv != nil {
+			log.Printf("HTTP server Shutdown error: %v", err_kv)
+			node.node_meta.raft_server.srv.Close()
+		}
+
+		node.node_meta.raft_server.close_chan<-true
+	}()
+
+	err := node.node_meta.raft_server.srv.ListenAndServe()
+
+	if err == http.ErrServerClosed {
+		<-node.node_meta.raft_server.close_chan
+	} else if err != nil {
+		CheckErrorFatal(err)
+	}
+}
+
+/*
+ * External function to gracefully shut down the raft server
+ */
+ func (node *RaftNode) StopRaftServer() {
+	// Stop the raft store service
+	if err_kv := node.node_meta.raft_server.srv.Shutdown(context.Background()); err_kv != nil {
+		log.Printf("HTTP server Shutdown error: %v", err_kv)
+	}
+
+	node.node_meta.raft_server.close_chan<-true
+}
+
+/*
+ * This function starts the gRPC server for the raft node and gracefully shuts it down when
+ * context is cancelled.
+ */
+ func (node *RaftNode) StartGRPCServer(parent_ctx context.Context, grpc_address string, listener *net.TCPListener) {
+	// Creating a context for the gRPC server thread
+	ctx, cancel := context.WithCancel(parent_ctx)
+	defer cancel()
+
+	// Gracefully shut down the gRPC server if the context is cancelled
+	go func() {
+		// Block till the context is cancelled
+		<-ctx.Done()
+
+		// Stop the server
+		node.node_meta.grpc_server.Stop()
+	}()
+
+	// Start the server
+	log.Printf("\n Starting gRPC server at address %v...\n", grpc_address)
+	err := node.node_meta.grpc_server.Serve(listener)
 	CheckErrorFatal(err)
-
 }
 
 func init() {
@@ -120,14 +219,18 @@ func setup_raft_node(id int, n_replicas int) *RaftNode {
  * initiation of their various services, like the
  * KV store server, the gRPC server and the Raft server.
  *
- * Returns -1 in case of an error and 0 in the case of successful execution.
+ * The `connect_chan` channel is used to signify the end of execution of this
+ * function for synchronization and error handling.
  */
-func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool) int {
+func (node *RaftNode) connect_raft_node(parent_ctx context.Context, id int, rep_addrs []string, testing bool, connect_chan chan bool) {
+	// Creating a master context for the whole raft application
+	ctx, _ := context.WithCancel(parent_ctx)
+	node.node_meta.master_ctx, node.node_meta.master_cancel = context.WithCancel(ctx)
 
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
-	go node.StartKVStore(kvstore_addr, id)
+	go node.StartKVStore(ctx, kvstore_addr, id)
 
 	/*
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
@@ -155,7 +258,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	 * ConnectToPeerReplicas is defined in raft_node.go.
 	 */
 	log.Println("Obtaining client stubs of gRPC servers running at peer replicas...")
-	node.ConnectToPeerReplicas(rep_addrs)
+	node.ConnectToPeerReplicas(ctx, rep_addrs)
 
 	// Setting up and running the gRPC server
 	grpc_address := ":500" + strconv.Itoa(id)
@@ -175,11 +278,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	protos.RegisterConsensusServiceServer(node.node_meta.grpc_server, node)
 
 	// Running the gRPC server
-	go func() {
-		err := node.node_meta.grpc_server.Serve(listener)
-		CheckErrorFatal(err)
-		log.Printf("\ngRPC server successfully listening at address %v\n", grpc_address)
-	}()
+	go node.StartGRPCServer(ctx, grpc_address, listener)
 
 	// TODO: wait till grpc server up
 
@@ -188,7 +287,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 	// Set up the server for the Raft functionalities
 	server_address := ":400" + strconv.Itoa(id)
 	log.Println("Starting raft replica server...")
-	go node.StartRaftServer(server_address)
+	go node.StartRaftServer(ctx, server_address)
 
 	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
 
@@ -206,7 +305,7 @@ func (node *RaftNode) connect_raft_node(id int, rep_addrs []string, testing bool
 		}
 	}
 
-	return 0
+	connect_chan<-true
 }
 
 func main() {
@@ -229,11 +328,18 @@ func main() {
 		rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
-	if node.connect_raft_node(rid, rep_addrs, false) == 0 {
-		log.Println("Node initialization procedure completed")
-	} else {
-		log.Println("Node initialization procedure failed")
-	}
+	// Create context here
+	ctx := context.Background()
+
+	// Create a channel to make sure the connection is successful
+	connect_chan := make(chan bool)
+
+	// Connect the node
+	node.connect_raft_node(ctx, rid, rep_addrs, false, connect_chan)
+
+	<-connect_chan
+
+	log.Printf("Node initialization successful")
 
 	// dummy channel to ensure program doesn't exit. Remove it later
 	all_connected := make(chan bool)

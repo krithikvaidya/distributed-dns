@@ -5,18 +5,21 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"context"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 type testing_st struct {
-	mu        sync.Mutex  // The mutex for performing operations on the struct
-	t         *testing.T  // The testing object for utility funcs to display errors
-	n         int         // The number of nodes in the system
-	rep_addrs []string    // The addresses of the replicas in the system
-	nodes     []*RaftNode // The RaftNode objects of the individual replicas
-	active    []bool      // The status of each node, whether it is active(true) or not(false)
-	start     time.Time   // Time at which make_testing_st() was called
+	mu          sync.Mutex           // The mutex for performing operations on the struct
+	t           *testing.T           // The testing object for utility funcs to display errors
+	n           int                  // The number of nodes in the system
+	rep_addrs   []string             // The addresses of the replicas in the system
+	nodes       []*RaftNode          // The RaftNode objects of the individual replicas
+	active      []bool               // The status of each node, whether it is active(true) or not(false)
+	ctx_list    []context.Context    // The list of contexts of all the raft nodes
+	cancel_list []context.CancelFunc // The list of cancel functions for the contexts
+	start       time.Time            // Time at which make_testing_st() was called
 }
 
 /*
@@ -32,13 +35,15 @@ type testing_st struct {
  * start the required services and connect the nodes
  * together.
  */
-func make_testing_st(t *testing.T, n int) *testing_st {
+func start_test(t *testing.T, n int) *testing_st {
 	new_test_st := &testing_st{}
 	new_test_st.t = t
 	new_test_st.n = n
 	new_test_st.nodes = make([]*RaftNode, n)
 	new_test_st.active = make([]bool, n)
 	new_test_st.rep_addrs = make([]string, n)
+	new_test_st.ctx_list = make([]context.Context, n)
+	new_test_st.cancel_list = make([]context.CancelFunc, n)
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
@@ -48,17 +53,35 @@ func make_testing_st(t *testing.T, n int) *testing_st {
 
 	// Connect the replicas together to setup the system
 	for i := 0; i < n; i++ {
-		status := new_test_st.nodes[i].connect_raft_node(i, new_test_st.rep_addrs, true)
+		// Create a channel to synchronize the creation of the nodes
+		connect_chan := make(chan bool)
 
-		if status == -1 {
-			t.Errorf("Node Initialization failure\n")
-		}
+		// Create the context for the current node
+		new_test_st.ctx_list[i], new_test_st.cancel_list[i] = context.WithCancel(context.Background())
+		go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true, connect_chan)
+
+		// Wait till the node is established
+		<-connect_chan
 
 		// Set the current node as active
 		new_test_st.active[i] = true
 	}
 
 	return new_test_st
+}
+
+/*
+ * This function is used to end a test case.
+ *
+ * This is done by bringing down all nodes in the current testing
+ * system by canceling the contexts of all of the nodes.
+ *
+ * Needs to be called at the end of every test.
+ */
+ func end_test(test_st *testing_st) {
+	for i := 0; i < test_st.n; i++ {
+		test_st.cancel_list[i]()
+	}
 }
 
 /*
@@ -71,18 +94,11 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	// Save the current status in persistent storage
 	test_st.nodes[id].persistToStorage()
 
-	// Kill the node by
-	// making the node_active variable false
+	// Mark the node as 'inactive'
 	test_st.active[id] = false
 
-	// Stop the KV store service
-	// test_st.nodes[id].kv_store_server.Close()
-
-	// Stop the raft service
-	// test_st.nodes[id].raft_server.Close()
-
-	// Stop the gRPC service
-	// test_st.nodes[id].grpc_server.Stop()
+	// Cancel the context of the node to be crashed
+	test_st.cancel_list[id]()
 }
 
 /*
@@ -100,6 +116,22 @@ func (test_st *testing_st) count_leader() int {
 	}
 
 	return n_leaders
+}
+
+/*
+ * This function is used to find the replica ID of the
+ * cuurent leader node in the system.
+ */
+ func (test_st *testing_st) find_leader() int {
+	leader_id := -1
+	for i := 0; i < test_st.n; i++ {
+		if test_st.active[i] {
+			if test_st.nodes[i].state == Leader {
+				leader_id = i
+			}
+		}
+	}
+	return leader_id
 }
 
 /*

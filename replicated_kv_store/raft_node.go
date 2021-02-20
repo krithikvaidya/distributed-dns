@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"context"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
@@ -27,13 +28,15 @@ type NodeMetadata struct {
 	replica_id            int32                           // The unique ID for the current replica
 	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
 	grpc_server           *grpc.Server                    // The gRPC server object
-	raft_server           *http.Server                    // The HTTP server object for the Raft server
-	kv_store_server       *http.Server                    // The HTTP server object for the KV store server[TODO]
+	raft_server           *HttpServer                     // The HTTP server object for the Raft server
+	kv_store_server       *HttpServer                     // The HTTP server object for the KV store server[TODO]
 	kvstore_addr          string                          // Stores the address of the local key value store
 	raft_persistence_file string                          // File where the log, currentTerm, votedFor, commitIndex and lastApplied are persisted
 	leaderAddress         string                          // Address of the last known leader
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
+	master_ctx           context.Context                  // A context derived from the master context for graceful shutdown
+	master_cancel        context.CancelFunc               // The cancel function for the above master context
 
 }
 
@@ -68,6 +71,14 @@ type RaftNode struct {
 
 	commits_ready chan int32 // Channel to signal the number of items commited once commit has been made to the log.
 	storage       *Storage   // Used for Persistence
+}
+
+/*
+ * Struct for representing a HTTP server
+ */
+ type HttpServer struct {
+	srv         *http.Server // The Server object
+	close_chan  chan bool    // The channel to synchronize the graceful shutdown of the server
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
@@ -120,7 +131,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 }
 
-func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
+func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []string) {
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
 	// The clients for each corresponding server is stored in client_objs.
@@ -158,13 +169,13 @@ func (node *RaftNode) ConnectToPeerReplicas(rep_addrs []string) {
 
 	if node.state == Follower {
 
-		go node.RunElectionTimer() // RunElectionTimer defined in election.go
+		go node.RunElectionTimer(ctx) // RunElectionTimer defined in election.go
 
 	} else if node.state == Candidate {
 
 		// If candidate, let it restart election. The timer for waiting
 		// for votes from other replicas will be called in StartElection
-		node.StartElection()
+		node.StartElection(ctx)
 
 		// CHECK:
 		// We don't call ToCandidate immediately here because we don't want to increment

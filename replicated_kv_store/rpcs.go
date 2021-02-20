@@ -26,7 +26,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 	// If the received message's term is greater than the replica's current term, transition to
 	// follower (if not already a follower) and update term.
 	if in.Term > node.currentTerm {
-		node.ToFollower(in.Term)
+		node.ToFollower(ctx, in.Term)
 	}
 
 	// If ToFollower was called above, in.Term and node.currentTerm will be equal. If in.Term < node.currentTerm, reject vote.
@@ -64,12 +64,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	} else if node.currentTerm < in.Term {
 
 		// current term is lesser than received term, we transition into being a follower and reset timer and update term
-		node.ToFollower(in.Term)
+		node.ToFollower(node.node_meta.master_ctx, in.Term)
 
 	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {
 
 		// the election for the current term has been won by another replica, and this replica should step down from candidacy
-		node.ToFollower(in.Term)
+		node.ToFollower(node.node_meta.master_ctx, in.Term)
 
 	}
 

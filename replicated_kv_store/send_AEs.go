@@ -12,13 +12,13 @@ import (
 )
 
 // To send AppendEntry to single replica, and retry if needed (called by LeaderSendAEs defined below).
-func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) (status bool) {
+func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32, upper_index int32, client_obj protos.ConsensusServiceClient, msg *protos.AppendEntriesMessage) (status bool) {
 
 	var response *protos.AppendEntriesResponse
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	ctx, _ := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	ctx, _ := context.WithTimeout(parent_ctx, 40*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
@@ -34,7 +34,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 		node.node_meta.peer_replica_clients[replica_id] = cli
 
 		// Call the AppendEntries RPC for the given client
-		ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		ctx, _ := context.WithTimeout(parent_ctx, 20*time.Millisecond)
 		response, err = client_obj.AppendEntries(ctx, msg)
 
 		if err != nil {
@@ -52,7 +52,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 
 		if response.Term > node.currentTerm {
 
-			node.ToFollower(response.Term)
+			node.ToFollower(parent_ctx, response.Term)
 			log.Printf("\nReturning false in LeaderSendAE because: response.Term > node.currentTerm\n")
 			return false
 		}
@@ -86,7 +86,7 @@ func (node *RaftNode) LeaderSendAE(replica_id int32, upper_index int32, client_o
 			LatestClient: node.node_meta.latestClient,
 		}
 
-		return node.LeaderSendAE(replica_id, upper_index, client_obj, new_msg)
+		return node.LeaderSendAE(parent_ctx, replica_id, upper_index, client_obj, new_msg)
 
 	} else {
 
@@ -138,7 +138,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 			msg.Entries = entries
 
-			if node.LeaderSendAE(replica_id, upper_index, client_obj, msg) {
+			if node.LeaderSendAE(node.node_meta.master_ctx, replica_id, upper_index, client_obj, msg) {
 
 				tot_success := atomic.AddInt32(&successes, 1)
 
@@ -171,37 +171,54 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 // HeartBeats is a goroutine that periodically makes leader
 // send heartbeats as long as it is the leader
-func (node *RaftNode) HeartBeats() {
+func (node *RaftNode) HeartBeats(parent_ctx context.Context) {
+
+	// Create a context for the heartbeat goroutine
+	ctx, cancel := context.WithCancel(parent_ctx)
+	_ = cancel
+	//defer cancel()
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
+	/*
+	 * The following select statements are to make sure that the context being
+	 * cancelled is prioritized more than the ticker. This makes sure that the
+	 * heartbeat procedure can be cancelled at any time.
+	 */
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			//log.Println("\nasking for Rlock")
+			node.raft_node_mutex.RLock()
+			//log.Println("\ngot Rlock")
+			if node.state != Leader {
 
-		<-ticker.C
-		//log.Println("\nasking for Rlock")
-		node.raft_node_mutex.RLock()
-		//log.Println("\ngot Rlock")
-		if node.state != Leader {
+				node.raft_node_mutex.RUnlock()
+				return
+			}
+
+			hbeat_msg := &protos.AppendEntriesMessage{
+
+				Term:         node.currentTerm,
+				LeaderId:     node.node_meta.replica_id,
+				LeaderCommit: node.commitIndex,
+				LeaderAddr:   node.node_meta.nodeAddress,
+				LatestClient: node.node_meta.latestClient,
+			}
 
 			node.raft_node_mutex.RUnlock()
-			return
+
+			success := make(chan bool)
+			node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)
+			<-success
 		}
-
-		hbeat_msg := &protos.AppendEntriesMessage{
-
-			Term:         node.currentTerm,
-			LeaderId:     node.node_meta.replica_id,
-			LeaderCommit: node.commitIndex,
-			LeaderAddr:   node.node_meta.nodeAddress,
-			LatestClient: node.node_meta.latestClient,
-		}
-
-		node.raft_node_mutex.RUnlock()
-
-		success := make(chan bool)
-		node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)
-		<-success
-
 	}
 }

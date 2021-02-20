@@ -2,12 +2,13 @@ package main
 
 import (
 	"log"
+	"context"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
 // ToFollower is called when you get a term higher than your own
-func (node *RaftNode) ToFollower(term int32) {
+func (node *RaftNode) ToFollower(ctx context.Context, term int32) {
 
 	log.Printf("\nIn ToFollower, previous state: %v\n", node.state)
 	prevState := node.state
@@ -21,7 +22,7 @@ func (node *RaftNode) ToFollower(term int32) {
 	// candidate, reset the election timer.
 
 	if prevState == Leader {
-		go node.RunElectionTimer()
+		go node.RunElectionTimer(ctx)
 	} else {
 		go func() {
 			node.electionResetEvent <- true
@@ -33,18 +34,18 @@ func (node *RaftNode) ToFollower(term int32) {
 
 // ToCandidate is called when election timer runs out
 // without heartbeat from leader
-func (node *RaftNode) ToCandidate() {
+func (node *RaftNode) ToCandidate(ctx context.Context) {
 
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.node_meta.replica_id
 	node.persistToStorage()
 	//we can start an election for the candidate to become the leader
-	node.StartElection()
+	node.StartElection(ctx)
 }
 
 // ToLeader is called when the candidate gets majority votes in election
-func (node *RaftNode) ToLeader() {
+func (node *RaftNode) ToLeader(ctx context.Context) {
 
 	log.Printf("\nTransitioned to leader\n")
 	// stop election timer since leader doesn't need it
@@ -97,5 +98,5 @@ func (node *RaftNode) ToLeader() {
 	node.raft_node_mutex.Unlock()
 	node.commits_ready <- 1
 
-	go node.HeartBeats()
+	go node.HeartBeats(ctx)
 }
