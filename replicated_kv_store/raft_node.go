@@ -35,8 +35,7 @@ type NodeMetadata struct {
 	leaderAddress         string                          // Address of the last known leader
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
-	server_term_chan      chan bool                       // channel indicating that a server has been terminated.
-
+	shutdown_chan         chan string                     // channel indicating termination of given module.
 }
 
 // Main struct storing different aspects of the replica and it's state
@@ -103,7 +102,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 		kvstore_addr:          keyvalue_addr,
 		raft_persistence_file: keyvalue_addr[1:],
 
-		server_term_chan: make(chan bool),
+		shutdown_chan: make(chan string),
 	}
 
 	raft_node.meta = meta
@@ -242,6 +241,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 		select {
 
 		case <-ctx.Done():
+			node.meta.shutdown_chan <- "ApplyToStateMachine shutdown successful."
 			return
 
 		case to_commit := <-node.commits_ready:

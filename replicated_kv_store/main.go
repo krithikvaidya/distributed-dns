@@ -70,7 +70,7 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		CheckErrorFatal(err)
 	}
 
-	node.meta.server_term_chan <- true
+	node.meta.shutdown_chan <- "KV store shutdown successful."
 
 }
 
@@ -133,7 +133,7 @@ func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 		CheckErrorFatal(err)
 	}
 
-	node.meta.server_term_chan <- true
+	node.meta.shutdown_chan <- "Client request listener shutdown successful."
 }
 
 /*
@@ -166,7 +166,7 @@ func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, 
 		// Stop the server
 		node.meta.grpc_server.Stop()
 
-		node.meta.server_term_chan <- true
+		node.meta.shutdown_chan <- "gRPC server shutdown successful."
 	}()
 
 	// Start the server
@@ -196,10 +196,10 @@ func init() {
 }
 
 /*
- * This function creates a raft node and imports the persistent
+ * This function initializes the node and imports the persistent
  * state information to the node.
  */
-func setup_raft_node(ctx context.Context, id int, n_replicas int) *RaftNode {
+func setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) *RaftNode {
 
 	// Key value store address of the current node
 	kv_addr := ":300" + strconv.Itoa(id)
@@ -209,21 +209,6 @@ func setup_raft_node(ctx context.Context, id int, n_replicas int) *RaftNode {
 
 	// ApplyToStateMachine() is defined in raft_node.go
 	go node.ApplyToStateMachine(ctx)
-
-	return node
-}
-
-/*
- * This function connects an existing node to a raft system.
- *
- * It connects the current node to the other nodes. This mechanism includes the
- * initiation of their various services, like the
- * KV store server, the gRPC server and the Raft server.
- *
- * The `connect_chan` channel is used to signify the end of execution of this
- * function for synchronization and error handling.
- */
-func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool) {
 
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
@@ -248,6 +233,21 @@ func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs [
 
 		}
 	}
+
+	return node
+}
+
+/*
+ * This function connects an existing node to a raft system.
+ *
+ * It connects the current node to the other nodes. This mechanism includes the
+ * initiation of their various services, like the
+ * KV store server, the gRPC server and the Raft server.
+ *
+ * The `connect_chan` channel is used to signify the end of execution of this
+ * function for synchronization and error handling.
+ */
+func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool) {
 
 	/*
 	 * Connect the new node to the existing nodes.
@@ -281,12 +281,12 @@ func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs [
 
 	// Now we can start listening to client requests
 
-	// Set up the server for the Raft functionalities
+	// Set up the server that listens for client requests.
 	server_address := ":400" + strconv.Itoa(id)
 	log.Println("Starting raft replica server...")
 	go node.StartRaftServer(ctx, server_address)
 
-	test_addr = fmt.Sprintf("http://localhost%s/test", server_address)
+	test_addr := fmt.Sprintf("http://localhost%s/test", server_address)
 
 	// Check whether the server is active
 	if !testing {
@@ -314,7 +314,7 @@ func main() {
 
 	master_context, master_cancel := context.WithCancel(context.Background())
 
-	node := setup_raft_node(master_context, rid, n_replica)
+	node := setup_raft_node(master_context, rid, n_replica, false)
 
 	// Store the gRPC address of other replicas
 	rep_addrs := make([]string, n_replica)
