@@ -2,12 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
-	"context"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 	"google.golang.org/grpc"
@@ -35,8 +35,8 @@ type NodeMetadata struct {
 	leaderAddress         string                          // Address of the last known leader
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
-	master_ctx           context.Context                  // A context derived from the master context for graceful shutdown
-	master_cancel        context.CancelFunc               // The cancel function for the above master context
+	master_ctx            context.Context                 // A context derived from the master context for graceful shutdown
+	master_cancel         context.CancelFunc              // The cancel function for the above master context
 
 }
 
@@ -45,7 +45,7 @@ type NodeMetadata struct {
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 
-	node_meta *NodeMetadata
+	meta *NodeMetadata
 
 	raft_node_mutex sync.RWMutex // The mutex for working with the RaftNode struct
 
@@ -76,9 +76,9 @@ type RaftNode struct {
 /*
  * Struct for representing a HTTP server
  */
- type HttpServer struct {
-	srv         *http.Server // The Server object
-	close_chan  chan bool    // The channel to synchronize the graceful shutdown of the server
+type HttpServer struct {
+	srv        *http.Server // The Server object
+	close_chan chan bool    // The channel to synchronize the graceful shutdown of the server
 }
 
 func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
@@ -103,7 +103,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 		storage:       NewStorage(),
 	}
 
-	node_meta := &NodeMetadata{
+	meta := &NodeMetadata{
 
 		n_replicas:           n_replica,
 		replica_id:           int32(rid),
@@ -113,9 +113,9 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 		raft_persistence_file: keyvalue_addr[1:],
 	}
 
-	raft_node.node_meta = node_meta
+	raft_node.meta = meta
 
-	if raft_node.storage.HasData(raft_node.node_meta.raft_persistence_file) {
+	if raft_node.storage.HasData(raft_node.meta.raft_persistence_file) {
 
 		raft_node.restoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
@@ -135,15 +135,15 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
 	// The clients for each corresponding server is stored in client_objs.
-	client_objs := make([]protos.ConsensusServiceClient, node.node_meta.n_replicas)
+	client_objs := make([]protos.ConsensusServiceClient, node.meta.n_replicas)
 
 	// NOTE: even if the grpc Dial to a given server fails the first time, the client stub can still be obtained.
 	// RPC requests using such client stubs will succeed when the connection can be established to
 	// the gRPC server.
 
-	for i := int32(0); i < node.node_meta.n_replicas; i++ {
+	for i := int32(0); i < node.meta.n_replicas; i++ {
 
-		if i == node.node_meta.replica_id {
+		if i == node.meta.replica_id {
 			continue
 		}
 
@@ -156,7 +156,7 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 		client_objs[i] = cli
 	}
 
-	node.node_meta.peer_replica_clients = client_objs
+	node.meta.peer_replica_clients = client_objs
 
 	// Check what the persisted state was (if any), and accordingly proceed
 	node.raft_node_mutex.Lock()
@@ -198,31 +198,31 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 
 	var t1, t2, t3, t4, t5 interface{}
 
-	if t1, check = node.storage.Get("currentTerm", node.node_meta.raft_persistence_file); !check {
+	if t1, check = node.storage.Get("currentTerm", node.meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
 
 	node.currentTerm = t1.(int32)
 
-	if t2, check = node.storage.Get("votedFor", node.node_meta.raft_persistence_file); !check {
+	if t2, check = node.storage.Get("votedFor", node.meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but votedFor not found in storage\n")
 	}
 
 	node.votedFor = t2.(int32)
 
-	if t3, check = node.storage.Get("log", node.node_meta.raft_persistence_file); !check {
+	if t3, check = node.storage.Get("log", node.meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but log not found in storage\n")
 	}
 
 	node.log = t3.([]protos.LogEntry)
 
-	if t4, check = node.storage.Get("commitIndex", node.node_meta.raft_persistence_file); !check {
+	if t4, check = node.storage.Get("commitIndex", node.meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but commitIndex not found in storage\n")
 	}
 
 	node.commitIndex = t4.(int32)
 
-	if t5, check = node.storage.Get("lastApplied", node.node_meta.raft_persistence_file); !check {
+	if t5, check = node.storage.Get("lastApplied", node.meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but lastApplied not found in storage\n")
 	}
 
@@ -237,7 +237,7 @@ func (node *RaftNode) persistToStorage() {
 	node.storage.Set("commitIndex", node.commitIndex)
 	node.storage.Set("lastApplied", node.lastApplied)
 
-	node.storage.WriteFile(node.node_meta.raft_persistence_file)
+	node.storage.WriteFile(node.meta.raft_persistence_file)
 
 }
 
@@ -269,7 +269,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				url := fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1])
+				url := fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1])
 				resp, err := http.PostForm(url, formData)
 
 				if err != nil {
@@ -285,7 +285,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 					"value": {entry.Operation[2]},
 				}
 
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					continue
@@ -302,7 +302,7 @@ func (node *RaftNode) ApplyToStateMachine() {
 
 			case "DELETE":
 
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.node_meta.kvstore_addr, entry.Operation[1]), nil)
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), nil)
 				if err != nil {
 					log.Printf("\nError in http.NewRequest: %v\n", err)
 					continue

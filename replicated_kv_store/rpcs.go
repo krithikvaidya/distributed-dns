@@ -64,12 +64,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	} else if node.currentTerm < in.Term {
 
 		// current term is lesser than received term, we transition into being a follower and reset timer and update term
-		node.ToFollower(node.node_meta.master_ctx, in.Term)
+		node.ToFollower(node.meta.master_ctx, in.Term)
 
 	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {
 
 		// the election for the current term has been won by another replica, and this replica should step down from candidacy
-		node.ToFollower(node.node_meta.master_ctx, in.Term)
+		node.ToFollower(node.meta.master_ctx, in.Term)
 
 	}
 
@@ -77,7 +77,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	// candidate.
 	node.electionResetEvent <- true
 
-	node.node_meta.leaderAddress = in.LeaderAddr // gets the leaders address
+	node.meta.leaderAddress = in.LeaderAddr // gets the leaders address
 
 	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
@@ -132,7 +132,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			log.Printf("\nin.LeaderCommit %v node.commitIndex %v int32(len(node.log)-1) %v\n", in.LeaderCommit, node.commitIndex, int32(len(node.log)-1))
 
-			node.node_meta.latestClient = in.LatestClient // stores the id of the most recent client
+			node.meta.latestClient = in.LatestClient // stores the id of the most recent client
 
 			for i := node.commitIndex + 1; i <= in.LeaderCommit && i < int32(len(node.log)); i++ {
 

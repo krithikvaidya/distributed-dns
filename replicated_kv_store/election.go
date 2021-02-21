@@ -81,9 +81,9 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 	var received_votes int32 = 1
 	replica_id := int32(0)
 
-	for _, client_obj := range node.node_meta.peer_replica_clients {
+	for _, client_obj := range node.meta.peer_replica_clients {
 
-		if replica_id == node.node_meta.replica_id {
+		if replica_id == node.meta.replica_id {
 			replica_id++
 			continue
 		}
@@ -103,7 +103,7 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 
 			args := protos.RequestVoteMessage{
 				Term:         node.currentTerm,
-				CandidateId:  node.node_meta.replica_id,
+				CandidateId:  node.meta.replica_id,
 				LastLogIndex: latestLogIndex,
 				LastLogTerm:  latestLogTerm,
 			}
@@ -140,7 +140,7 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 						// log.Printf("\nReceived vote from %v\n", replica_id)
 						votes := int(atomic.AddInt32(&received_votes, 1))
 
-						if votes*2 > int(node.node_meta.n_replicas) { // won the Election
+						if votes*2 > int(node.meta.n_replicas) { // won the Election
 							node.ToLeader(ctx)
 
 							return

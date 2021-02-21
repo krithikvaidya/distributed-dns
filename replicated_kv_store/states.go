@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
 	"context"
+	"log"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -38,7 +38,7 @@ func (node *RaftNode) ToCandidate(ctx context.Context) {
 
 	node.state = Candidate
 	node.currentTerm++
-	node.votedFor = node.node_meta.replica_id
+	node.votedFor = node.meta.replica_id
 	node.persistToStorage()
 	//we can start an election for the candidate to become the leader
 	node.StartElection(ctx)
@@ -53,13 +53,13 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 
 	node.state = Leader
 
-	node.nextIndex = make([]int32, node.node_meta.n_replicas, node.node_meta.n_replicas)
-	node.matchIndex = make([]int32, node.node_meta.n_replicas, node.node_meta.n_replicas)
+	node.nextIndex = make([]int32, node.meta.n_replicas, node.meta.n_replicas)
+	node.matchIndex = make([]int32, node.meta.n_replicas, node.meta.n_replicas)
 
 	// initialize nextIndex, matchIndex
-	for replica_id := int32(0); replica_id < node.node_meta.n_replicas; replica_id++ {
+	for replica_id := int32(0); replica_id < node.meta.n_replicas; replica_id++ {
 
-		if int32(replica_id) == node.node_meta.replica_id {
+		if int32(replica_id) == node.meta.replica_id {
 			continue
 		}
 
@@ -79,10 +79,10 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 	msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.node_meta.replica_id,
+		LeaderId:     node.meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LeaderAddr:   node.node_meta.nodeAddress,
-		LatestClient: node.node_meta.latestClient,
+		LeaderAddr:   node.meta.nodeAddress,
+		LatestClient: node.meta.latestClient,
 	}
 
 	node.persistToStorage()
