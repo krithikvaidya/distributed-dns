@@ -16,15 +16,18 @@ import (
 func (node *RaftNode) WriteCommand(operation []string, client string) (bool, error) {
 
 	for node.commitIndex != node.lastApplied {
-		node.raft_node_mutex.RUnlock()
+
+		node.raft_node_mutex.RUnlock() // Lock was acquired in the respective calling Handler function in raft_server.go
 		time.Sleep(20 * time.Millisecond)
 		node.raft_node_mutex.RLock()
+
 	}
-	node.raft_node_mutex.RUnlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+
+	node.raft_node_mutex.RUnlock()
 	node.raft_node_mutex.Lock()
 
 	if node.state != Leader {
-		node.raft_node_mutex.Unlock()
+		defer node.raft_node_mutex.Unlock()
 		return false, errors.New("\nNot a leader.\n")
 	}
 
@@ -33,7 +36,14 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	lastClientOper, val := node.trackMessage[client] //lastClientOper is the operation done by the given client previously
 
-	//check if entry exists; if it does check if its the same as the one that was previously
+	/**
+	* We do not want to accept duplicate PUT/POST/DELETE requests from clients.
+	* In case the latest request that the raft system has received is the same
+	* as the most latest received request, and the client for that request is the
+	* same, then we reject it.
+	* TODO: implement the functionality for DELETE. DELETE requests are not allowed to
+	* have a request body.
+	 */
 	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
 		equal = equal && client == node.meta.latestClient
@@ -41,19 +51,18 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	if equal {
 		Err = errors.New("Write operation failed. Already received identical write request from identical clientid.")
-		node.raft_node_mutex.Unlock()
+		defer node.raft_node_mutex.Unlock()
 		return false, Err
 	}
 
 	// If it's a PUT or DELETE request, ensure that the resource exists.
 	if operation[0] == "PUT" || operation[0] == "DELETE" {
 
+		// ReadCommand() requires that only a readlock has been obtained in the
+		// caller function.
 		node.raft_node_mutex.Unlock()
 		node.raft_node_mutex.RLock()
 		response, err := node.ReadCommand(operation[1])
-
-		log.Printf("ok" + response + "ok")
-		log.Printf("%v", (response == "Invalid key value pair\n"))
 
 		if err == nil && response == "Invalid key value pair\n" {
 			prnt_str := fmt.Sprintf("\nUnable to perform %v request, no value exists for given key in the store.\n", operation[0])
@@ -92,11 +101,10 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 		node.raft_node_mutex.Lock()
 		node.commitIndex++
+		node.trackMessage[client] = operation
 		node.persistToStorage()
 		node.raft_node_mutex.Unlock()
 		node.commits_ready <- 1
-
-		node.trackMessage[client] = operation
 
 	} else {
 		Err = errors.New("Write operation failed. Write could not be replicated on majority of nodes.")
@@ -114,10 +122,10 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 		node.raft_node_mutex.RLock()
 	}
 
-	write_success := make(chan bool)
-	node.StaleReadCheck(write_success)
+	heartbeat_success := make(chan bool)
+	node.StaleReadCheck(heartbeat_success)
 	node.raft_node_mutex.RUnlock()
-	status := <-write_success
+	status := <-heartbeat_success
 
 	node.raft_node_mutex.RLock()
 	defer node.raft_node_mutex.RUnlock()
@@ -157,7 +165,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 }
 
 // StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come
-func (node *RaftNode) StaleReadCheck(write_success chan bool) {
+func (node *RaftNode) StaleReadCheck(heartbeat_success chan bool) {
 
 	hbeat_msg := &protos.AppendEntriesMessage{
 
@@ -168,5 +176,5 @@ func (node *RaftNode) StaleReadCheck(write_success chan bool) {
 		LeaderAddr:   node.meta.nodeAddress,
 	}
 
-	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), write_success)
+	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), heartbeat_success)
 }

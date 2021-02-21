@@ -26,7 +26,7 @@ const (
 type NodeMetadata struct {
 	n_replicas            int32                           // The number of replicas in the current replicated system
 	replica_id            int32                           // The unique ID for the current replica
-	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
+	peer_replica_clients  []protos.ConsensusServiceClient // Client objects to send messages to other peers
 	grpc_server           *grpc.Server                    // The gRPC server object
 	raft_server           *http.Server                    // The HTTP server object for the Raft server
 	kv_store_server       *http.Server                    // The HTTP server object for the KV store server[TODO]
@@ -35,7 +35,7 @@ type NodeMetadata struct {
 	leaderAddress         string                          // Address of the last known leader
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
-	shutdown_chan         chan string                     // channel indicating termination of given module.
+	shutdown_chan         chan string                     // Channel indicating termination of given module.
 }
 
 // Main struct storing different aspects of the replica and it's state
@@ -154,7 +154,7 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 	node.raft_node_mutex.Lock()
 	defer node.raft_node_mutex.Unlock()
 
-	// suppose node dies before that series of commits have been applied then we want to finish it
+	// suppose node dies before some commits have been applied, then we want to finish applying them.
 	if node.commitIndex > node.lastApplied {
 		node.commits_ready <- (node.commitIndex - node.lastApplied)
 	}
@@ -169,11 +169,6 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 		// for votes from other replicas will be called in StartElection
 		node.StartElection(ctx)
 
-		// CHECK:
-		// We don't call ToCandidate immediately here because we don't want to increment
-		// currentTerm and node.state and node.votedFor are already set correctly, so
-		// nothing to persist.
-
 	} else if node.state == Leader {
 
 		// if node was a leader before we want to give up leadership.
@@ -181,55 +176,6 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 		// automatically convert it back to follower and call the election timer.
 
 	}
-
-}
-
-func (node *RaftNode) restoreFromStorage(storage *Storage) {
-
-	var check bool
-
-	var t1, t2, t3, t4, t5 interface{}
-
-	if t1, check = node.storage.Get("currentTerm", node.meta.raft_persistence_file); !check {
-		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
-	}
-
-	node.currentTerm = t1.(int32)
-
-	if t2, check = node.storage.Get("votedFor", node.meta.raft_persistence_file); !check {
-		log.Fatalf("\nFatal: persisted data found, but votedFor not found in storage\n")
-	}
-
-	node.votedFor = t2.(int32)
-
-	if t3, check = node.storage.Get("log", node.meta.raft_persistence_file); !check {
-		log.Fatalf("\nFatal: persisted data found, but log not found in storage\n")
-	}
-
-	node.log = t3.([]protos.LogEntry)
-
-	if t4, check = node.storage.Get("commitIndex", node.meta.raft_persistence_file); !check {
-		log.Fatalf("\nFatal: persisted data found, but commitIndex not found in storage\n")
-	}
-
-	node.commitIndex = t4.(int32)
-
-	if t5, check = node.storage.Get("lastApplied", node.meta.raft_persistence_file); !check {
-		log.Fatalf("\nFatal: persisted data found, but lastApplied not found in storage\n")
-	}
-
-	node.lastApplied = t5.(int32)
-}
-
-func (node *RaftNode) persistToStorage() {
-
-	node.storage.Set("currentTerm", node.currentTerm)
-	node.storage.Set("votedFor", node.votedFor)
-	node.storage.Set("log", node.log)
-	node.storage.Set("commitIndex", node.commitIndex)
-	node.storage.Set("lastApplied", node.lastApplied)
-
-	node.storage.WriteFile(node.meta.raft_persistence_file)
 
 }
 
@@ -327,7 +273,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 			node.lastApplied = node.lastApplied + to_commit
 			node.persistToStorage()
-			// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+
 			node.raft_node_mutex.Unlock()
 
 		}

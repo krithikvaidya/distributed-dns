@@ -10,14 +10,12 @@ import (
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
 
-// RunElectionTimer runs an election if no heartbeat is received
+// RunElectionTimer runs an election and initiates transition to candidate
+// if a heartbeat/appendentries RPC is not received within the timeout duration.
 func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
-	// Create a context for the election timer thread
-	ctx, cancel := context.WithCancel(parent_ctx)
-	_ = cancel
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(300+rand.Intn(200)) * time.Millisecond
+	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 
 	/*
 	 * Make sure that election is not run when context is cancelled by prioritizing
@@ -25,34 +23,41 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 	 */
 	select {
 
-	case <-ctx.Done():
-		return
-
 	case <-time.After(duration): // for timeout to call election
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
 
 		node.raft_node_mutex.Lock()
 
-		// by the time the lock was acquired, if the electionResetEvent or the stopElectionTimer channels
-		// are written to, don't transition to candidate.
+		// by the time the lock was acquired, if either
+		// 1. context cancel has occured
+		// 2. the electionResetEvent channel has been written to
+		// 3. the stopElectionTimer channel has been written to
+		// don't transition to candidate.
+
 		select {
 
-		case <-node.stopElectiontimer: //to stop timer
-			node.raft_node_mutex.Unlock()
-			return
-
-		case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
-
-			node.raft_node_mutex.Unlock()
-			go node.RunElectionTimer(ctx)
+		// prioritize checking if context is cancelled.
+		case <-parent_ctx.Done():
 			return
 
 		default:
-			break // break out of select block
+
+			select {
+
+			case <-node.stopElectiontimer: // to stop timer
+				defer node.raft_node_mutex.Unlock()
+				return
+
+			case <-node.electionResetEvent: // to reset timer when heartbeat/msg received
+
+				node.raft_node_mutex.Unlock()
+				go node.RunElectionTimer(parent_ctx)
+				return
+
+			default:
+				break // break out of select block
+
+			}
+
 		}
 
 		log.Printf("\nElection timer runs out.\n")
@@ -60,7 +65,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 
-		node.ToCandidate(ctx)
+		node.ToCandidate(parent_ctx)
 
 		node.raft_node_mutex.Unlock()
 		return
@@ -69,7 +74,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 		return
 
 	case <-node.electionResetEvent: //to reset timer when heartbeat/msg received
-		go node.RunElectionTimer(ctx)
+		go node.RunElectionTimer(parent_ctx)
 		return
 
 	}
@@ -109,16 +114,13 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 			}
 
 			node.raft_node_mutex.RUnlock()
-			// log.Printf("\nRUnLock in StartElection\n")
 
 			//request vote and get reply
 			response, err := client_obj.RequestVote(ctx, &args)
 
 			node.raft_node_mutex.Lock()
-			// log.Printf("\nLock in StartElection after response\n")
-			if err == nil {
 
-				// log.Printf("\nReceived reply from %v\n", replica_id)
+			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 
