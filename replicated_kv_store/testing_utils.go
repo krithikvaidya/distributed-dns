@@ -60,7 +60,9 @@ func start_test(t *testing.T, n int) *testing_st {
 
 		// Create the context for the current node
 		new_test_st.ctx_list[i], new_test_st.cancel_list[i] = context.WithCancel(context.Background())
-		go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true, connect_chan)
+
+		// UNCOMMENT
+		// go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true, connect_chan)
 
 		// Wait till the node is established
 		<-connect_chan

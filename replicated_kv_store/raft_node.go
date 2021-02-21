@@ -35,8 +35,7 @@ type NodeMetadata struct {
 	leaderAddress         string                          // Address of the last known leader
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
-	master_ctx            context.Context                 // A context derived from the master context for graceful shutdown
-	master_cancel         context.CancelFunc              // The cancel function for the above master context
+	server_term_chan      chan bool                       // channel indicating that a server has been terminated.
 
 }
 
@@ -103,6 +102,8 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 		kvstore_addr:          keyvalue_addr,
 		raft_persistence_file: keyvalue_addr[1:],
+
+		server_term_chan: make(chan bool),
 	}
 
 	raft_node.meta = meta

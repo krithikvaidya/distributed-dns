@@ -138,7 +138,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 			msg.Entries = entries
 
-			if node.LeaderSendAE(node.meta.master_ctx, replica_id, upper_index, client_obj, msg) {
+			if node.LeaderSendAE(context.Background(), replica_id, upper_index, client_obj, msg) { // CHECK
 
 				tot_success := atomic.AddInt32(&successes, 1)
 

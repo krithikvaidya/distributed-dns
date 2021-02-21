@@ -70,6 +70,8 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		CheckErrorFatal(err)
 	}
 
+	node.meta.server_term_chan <- true
+
 }
 
 /*
@@ -130,6 +132,8 @@ func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 	if (err != nil) && (err != http.ErrServerClosed) {
 		CheckErrorFatal(err)
 	}
+
+	node.meta.server_term_chan <- true
 }
 
 /*
@@ -162,6 +166,7 @@ func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, 
 		// Stop the server
 		node.meta.grpc_server.Stop()
 
+		node.meta.server_term_chan <- true
 	}()
 
 	// Start the server
@@ -218,7 +223,7 @@ func setup_raft_node(ctx context.Context, id int, n_replicas int) *RaftNode {
  * The `connect_chan` channel is used to signify the end of execution of this
  * function for synchronization and error handling.
  */
-func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool, connect_chan chan bool) {
+func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool) {
 
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
@@ -297,7 +302,6 @@ func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs [
 		}
 	}
 
-	connect_chan <- true
 }
 
 func main() {
@@ -308,7 +312,7 @@ func main() {
 	var rid int
 	fmt.Scanf("%d", &rid)
 
-	master_context, _ := context.WithCancel(context.Background())
+	master_context, master_cancel := context.WithCancel(context.Background())
 
 	node := setup_raft_node(master_context, rid, n_replica)
 
@@ -322,21 +326,10 @@ func main() {
 		rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
-	// Create context here
-	ctx := context.Background()
-
-	// Create a channel to make sure the connection is successful
-	connect_chan := make(chan bool)
-
-	// Connect the node
-	node.connect_raft_node(ctx, rid, rep_addrs, false, connect_chan)
-
-	<-connect_chan
+	// Perform steps necessary to setup the node as an active replica.
+	node.connect_raft_node(master_context, rid, rep_addrs, false)
 
 	log.Printf("Node initialization successful")
 
-	// dummy channel to ensure program doesn't exit. Remove it later
-	all_connected := make(chan bool)
-	<-all_connected
-
+	node.ListenForShutdown(master_cancel)
 }
