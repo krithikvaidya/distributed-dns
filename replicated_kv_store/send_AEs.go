@@ -138,11 +138,9 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 			msg.Entries = entries
 
-			if node.LeaderSendAE(context.Background(), replica_id, upper_index, client_obj, msg) { // CHECK
+			if node.LeaderSendAE(context.Background(), replica_id, upper_index, client_obj, msg) {
 
 				tot_success := atomic.AddInt32(&successes, 1)
-
-				//log.Printf("Sending AE SUCCESS for replica %v\n", replica_id)
 
 				if tot_success == (node.meta.n_replicas)/2+1 { // write quorum achieved
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
@@ -151,15 +149,12 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				//log.Printf("Sending AE FAILED for replica %v\n", replica_id)
-
 				if tot_fail == (node.meta.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
-			//log.Printf("Trying to Unlock on %d\n", replica_id)
+
 			node.raft_node_mutex.Unlock()
-			//log.Printf("Unlock on %d", replica_id)
 
 		}(node, client_obj, replica_id, upper_index, successful_write)
 

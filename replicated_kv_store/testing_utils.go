@@ -48,24 +48,18 @@ func start_test(t *testing.T, n int) *testing_st {
 	// Create the replicas
 	for i := 0; i < n; i++ {
 
-		// UNCOMMENT
-		// new_test_st.nodes[i] = setup_raft_node(i, new_test_st.n)
+		new_test_st.nodes[i] = setup_raft_node(context.Background(), i, new_test_st.n, true)
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
 	// Connect the replicas together to setup the system
 	for i := 0; i < n; i++ {
-		// Create a channel to synchronize the creation of the nodes
-		connect_chan := make(chan bool)
 
 		// Create the context for the current node
 		new_test_st.ctx_list[i], new_test_st.cancel_list[i] = context.WithCancel(context.Background())
 
-		// UNCOMMENT
-		// go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true, connect_chan)
-
-		// Wait till the node is established
-		<-connect_chan
+		// Check
+		go new_test_st.nodes[i].connect_raft_node(context.Background(), i, new_test_st.rep_addrs, true)
 
 		// Set the current node as active
 		new_test_st.active[i] = true

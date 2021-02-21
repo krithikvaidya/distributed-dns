@@ -18,7 +18,7 @@ func (node *RaftNode) ToFollower(ctx context.Context, term int32) {
 
 	node.persistToStorage()
 
-	// CHECK: If node was a leader, start election timer. Else if it was a follower or
+	// If node was a leader, start election timer. Else if it was a follower or
 	// candidate, reset the election timer.
 
 	if prevState == Leader {
@@ -40,7 +40,7 @@ func (node *RaftNode) ToCandidate(ctx context.Context) {
 	node.currentTerm++
 	node.votedFor = node.meta.replica_id
 	node.persistToStorage()
-	//we can start an election for the candidate to become the leader
+	// We can start an election for the candidate to become the leader
 	node.StartElection(ctx)
 }
 
@@ -48,7 +48,8 @@ func (node *RaftNode) ToCandidate(ctx context.Context) {
 func (node *RaftNode) ToLeader(ctx context.Context) {
 
 	log.Printf("\nTransitioned to leader\n")
-	// stop election timer since leader doesn't need it
+
+	// Stop election timer since leader doesn't need it
 	node.stopElectiontimer <- true
 
 	node.state = Leader
@@ -56,7 +57,7 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 	node.nextIndex = make([]int32, node.meta.n_replicas, node.meta.n_replicas)
 	node.matchIndex = make([]int32, node.meta.n_replicas, node.meta.n_replicas)
 
-	// initialize nextIndex, matchIndex
+	// Initialize nextIndex, matchIndex
 	for replica_id := int32(0); replica_id < node.meta.n_replicas; replica_id++ {
 
 		if int32(replica_id) == node.meta.replica_id {
@@ -68,8 +69,8 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 
 	}
 
-	// send no-op for synchronization
-	// first obtain prevLogIndex and prevLogTerm
+	// Send no-op for synchronization
+	// First obtain prevLogIndex and prevLogTerm
 
 	var operation []string
 	operation = append(operation, "NO-OP")
