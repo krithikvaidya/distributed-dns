@@ -28,8 +28,8 @@ type NodeMetadata struct {
 	replica_id            int32                           // The unique ID for the current replica
 	peer_replica_clients  []protos.ConsensusServiceClient // client objects to send messages to other peers
 	grpc_server           *grpc.Server                    // The gRPC server object
-	raft_server           *HttpServer                     // The HTTP server object for the Raft server
-	kv_store_server       *HttpServer                     // The HTTP server object for the KV store server[TODO]
+	raft_server           *http.Server                    // The HTTP server object for the Raft server
+	kv_store_server       *http.Server                    // The HTTP server object for the KV store server[TODO]
 	kvstore_addr          string                          // Stores the address of the local key value store
 	raft_persistence_file string                          // File where the log, currentTerm, votedFor, commitIndex and lastApplied are persisted
 	leaderAddress         string                          // Address of the last known leader
@@ -73,14 +73,6 @@ type RaftNode struct {
 	storage       *Storage   // Used for Persistence
 }
 
-/*
- * Struct for representing a HTTP server
- */
-type HttpServer struct {
-	srv        *http.Server // The Server object
-	close_chan chan bool    // The channel to synchronize the graceful shutdown of the server
-}
-
 func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 	// Initializes RaftNode and NodeMetadata
@@ -119,7 +111,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 		raft_node.restoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
-		log.Printf("\nCurrent currentTerm: %v\nCurrent votedFor: %v\nCurrent log: %v\nCurrent log length: %v\n", raft_node.currentTerm, raft_node.votedFor, raft_node.log, len(raft_node.log))
+		log.Printf("\nRestored currentTerm: %v\nRestored votedFor: %v\nRestored log: %v\nRestored log length: %v\n", raft_node.currentTerm, raft_node.votedFor, raft_node.log, len(raft_node.log))
 
 	} else {
 
@@ -242,94 +234,102 @@ func (node *RaftNode) persistToStorage() {
 }
 
 // Apply committed entries to our key-value store.
-func (node *RaftNode) ApplyToStateMachine() {
+func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 	for {
 
-		// log.Printf("\nIn ApplyToStateMachine\n")
-		to_commit := <-node.commits_ready
-		log.Printf("\nApplyToStateMachine received commit(s)\n")
+		select {
 
-		node.raft_node_mutex.Lock()
+		case <-ctx.Done():
+			return
 
-		var entries []protos.LogEntry
+		case to_commit := <-node.commits_ready:
 
-		// Get the entries that are uncommited and need to be applied.
-		entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit+1]
+			log.Printf("\nApplyToStateMachine received commit(s)\n")
 
-		for _, entry := range entries {
+			node.raft_node_mutex.Lock()
 
-			client := http.Client{}
+			var entries []protos.LogEntry
 
-			switch entry.Operation[0] {
+			// Get the entries that are uncommited and need to be applied.
+			entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit+1]
 
-			case "POST":
+			for _, entry := range entries {
 
-				formData := url.Values{
-					"value": {entry.Operation[2]},
+				client := http.Client{}
+
+				switch entry.Operation[0] {
+
+				case "POST":
+
+					formData := url.Values{
+						"value": {entry.Operation[2]},
+					}
+
+					url := fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1])
+					resp, err := http.PostForm(url, formData)
+
+					if err != nil {
+						log.Printf("\nError in client.Do(req): %v\n", err)
+						continue
+					}
+
+					resp.Body.Close()
+
+				case "PUT":
+
+					formData := url.Values{
+						"value": {entry.Operation[2]},
+					}
+
+					req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+					if err != nil {
+						log.Printf("\nError in http.NewRequest: %v\n", err)
+						continue
+					}
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+					resp, err := client.Do(req)
+					if err != nil {
+						log.Printf("\nError in client.Do: %v\n", err)
+						continue
+					}
+
+					resp.Body.Close()
+
+				case "DELETE":
+
+					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), nil)
+					if err != nil {
+						log.Printf("\nError in http.NewRequest: %v\n", err)
+						continue
+					}
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded;")
+
+					resp, err := client.Do(req)
+					if err != nil {
+						log.Printf("\nError in client.Do: %v\n", err)
+						continue
+					}
+
+					resp.Body.Close()
+
+				case "NO-OP":
+					log.Printf("\nNO-OP encountered, continuing...\n")
+
+				default:
+					log.Printf("\nFatal: Invalid operation: %v\n", entry.Operation[0])
+
 				}
-
-				url := fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1])
-				resp, err := http.PostForm(url, formData)
-
-				if err != nil {
-					log.Printf("\nError in client.Do(req): %v\n", err)
-					continue
-				}
-
-				resp.Body.Close()
-
-			case "PUT":
-
-				formData := url.Values{
-					"value": {entry.Operation[2]},
-				}
-
-				req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
-				if err != nil {
-					log.Printf("\nError in http.NewRequest: %v\n", err)
-					continue
-				}
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Printf("\nError in client.Do: %v\n", err)
-					continue
-				}
-
-				resp.Body.Close()
-
-			case "DELETE":
-
-				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), nil)
-				if err != nil {
-					log.Printf("\nError in http.NewRequest: %v\n", err)
-					continue
-				}
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded;")
-
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Printf("\nError in client.Do: %v\n", err)
-					continue
-				}
-
-				resp.Body.Close()
-
-			case "NO-OP":
-				log.Printf("\nNO-OP encountered, continuing...\n")
-
-			default:
-				log.Printf("\nFatal: Invalid operation: %v\n", entry.Operation[0])
 
 			}
 
+			node.lastApplied = node.lastApplied + to_commit
+			node.persistToStorage()
+			// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
+			node.raft_node_mutex.Unlock()
+
 		}
 
-		node.lastApplied = node.lastApplied + to_commit
-		node.persistToStorage()
-		// log.Printf("Required Operations done to kv_store; Current lastApplied: %v", node.lastApplied)
-		node.raft_node_mutex.Unlock()
 	}
 }

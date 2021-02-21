@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
-	"context"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -47,7 +47,9 @@ func start_test(t *testing.T, n int) *testing_st {
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
-		new_test_st.nodes[i] = setup_raft_node(i, new_test_st.n)
+
+		// UNCOMMENT
+		// new_test_st.nodes[i] = setup_raft_node(i, new_test_st.n)
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
@@ -78,7 +80,7 @@ func start_test(t *testing.T, n int) *testing_st {
  *
  * Needs to be called at the end of every test.
  */
- func end_test(test_st *testing_st) {
+func end_test(test_st *testing_st) {
 	for i := 0; i < test_st.n; i++ {
 		test_st.cancel_list[i]()
 	}
@@ -122,7 +124,7 @@ func (test_st *testing_st) count_leader() int {
  * This function is used to find the replica ID of the
  * cuurent leader node in the system.
  */
- func (test_st *testing_st) find_leader() int {
+func (test_st *testing_st) find_leader() int {
 	leader_id := -1
 	for i := 0; i < test_st.n; i++ {
 		if test_st.active[i] {

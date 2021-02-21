@@ -20,11 +20,12 @@ import (
 
 var n_replica int
 
-// Start the local key-value store and the HTTP server it listens for requests on:
+// Start the local key-value store and the HTTP server it listens for requests on.
 func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 
 	filename := "600" + strconv.Itoa(num)
 
+	// InitializeStore is defined in kv_store/restaccess_key_value.go
 	kv := kv_store.InitializeStore(filename)
 
 	r := mux.NewRouter()
@@ -41,11 +42,7 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		Addr:    addr,
 	}
 
-	kv_store_server := &HttpServer{
-		srv: srv,
-	}
-
-	node.meta.kv_store_server = kv_store_server
+	node.meta.kv_store_server = srv
 
 	// Gracefully shut down the server if context is cancelled
 	go func() {
@@ -57,16 +54,16 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		// We use HTTP's inbuilt Shutdown() and Close() methods for this.
 		ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 
-		if err_kv := node.meta.kv_store_server.srv.Shutdown(ctx); err_kv != nil {
+		if err_kv := node.meta.kv_store_server.Shutdown(ctx); err_kv != nil {
 
-			log.Printf("HTTP server Shutdown error: %v", err_kv)
-			node.meta.kv_store_server.srv.Close()
+			log.Printf("HTTP server Shutdown error: %v\n", err_kv)
+			node.meta.kv_store_server.Close()
 
 		}
 
 	}()
 
-	err := node.meta.kv_store_server.srv.ListenAndServe()
+	err := node.meta.kv_store_server.ListenAndServe()
 
 	// Handling code for when the server is unexpectedly closed.
 	if (err != nil) && (err != http.ErrServerClosed) {
@@ -76,20 +73,21 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 }
 
 /*
- * External function to gracefully shut down the kv store server
+ * External function to shut down the kv store server.
  */
 func (node *RaftNode) StopKVStore() {
 
-	// Stop the KV store service
-	if err_kv := node.meta.kv_store_server.srv.Shutdown(context.Background()); err_kv != nil {
-		log.Printf("HTTP server Shutdown error: %v", err_kv)
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+
+	if err := node.meta.kv_store_server.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server Shutdown error: %v\n", err)
+		node.meta.kv_store_server.Close()
 	}
 
-	node.meta.kv_store_server.close_chan <- true
 }
 
 // Start HTTP server to listen for client requests
-func (node *RaftNode) StartRaftServer(parent_ctx context.Context, addr string) {
+func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 
 	node.meta.nodeAddress = addr // store address of the node
 
@@ -102,41 +100,34 @@ func (node *RaftNode) StartRaftServer(parent_ctx context.Context, addr string) {
 	r.HandleFunc("/{key}", node.DeleteHandler).Methods("DELETE")
 
 	// Create a server struct
-	srv := &http.Server{
+	raft_server := &http.Server{
 		Handler: r,
 		Addr:    addr,
 	}
 
-	raft_server := &HttpServer{
-		srv:        srv,
-		close_chan: make(chan bool),
-	}
-
 	node.meta.raft_server = raft_server
-
-	// Creating a context for the raft server handler thread
-	ctx, cancel := context.WithCancel(parent_ctx)
-	defer cancel()
 
 	// Gracefully shut down the server if context is cancelled
 	go func() {
+
 		// Block till context is cancelled
 		<-ctx.Done()
 
 		// Shut down the server. On error, forcefully close the server
-		if err_kv := node.meta.raft_server.srv.Shutdown(context.Background()); err_kv != nil {
-			log.Printf("HTTP server Shutdown error: %v", err_kv)
-			node.meta.raft_server.srv.Close()
+		// We use HTTP's inbuilt Shutdown() and Close() methods for this.
+		ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+
+		if err_kv := node.meta.raft_server.Shutdown(ctx); err_kv != nil {
+			log.Printf("HTTP server Shutdown error: %v\n", err_kv)
+			node.meta.raft_server.Close()
 		}
 
-		node.meta.raft_server.close_chan <- true
 	}()
 
-	err := node.meta.raft_server.srv.ListenAndServe()
+	err := node.meta.raft_server.ListenAndServe()
 
-	if err == http.ErrServerClosed {
-		<-node.meta.raft_server.close_chan
-	} else if err != nil {
+	// Handling code for when the server is unexpectedly closed.
+	if (err != nil) && (err != http.ErrServerClosed) {
 		CheckErrorFatal(err)
 	}
 }
@@ -145,32 +136,38 @@ func (node *RaftNode) StartRaftServer(parent_ctx context.Context, addr string) {
  * External function to gracefully shut down the raft server
  */
 func (node *RaftNode) StopRaftServer() {
+
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+
 	// Stop the raft store service
-	if err_kv := node.meta.raft_server.srv.Shutdown(context.Background()); err_kv != nil {
-		log.Printf("HTTP server Shutdown error: %v", err_kv)
+	if err := node.meta.raft_server.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server Shutdown error: %v\n", err)
+		node.meta.kv_store_server.Close()
 	}
 
-	node.meta.raft_server.close_chan <- true
 }
 
 /*
- * This function starts the gRPC server for the raft node and gracefully shuts it down when
+ * This function starts the gRPC server for the raft node and shuts it down when
  * context is cancelled.
  */
 func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, listener *net.TCPListener) {
 
-	// Gracefully shut down the gRPC server if the context is cancelled
+	// Shut down the gRPC server if the context is cancelled
 	go func() {
+
 		// Block till the context is cancelled
 		<-ctx.Done()
 
 		// Stop the server
 		node.meta.grpc_server.Stop()
+
 	}()
 
 	// Start the server
-	log.Printf("\n Starting gRPC server at address %v...\n", grpc_address)
+	log.Printf("\nStarting gRPC server at address %v...\n", grpc_address)
 	err := node.meta.grpc_server.Serve(listener)
+
 	CheckErrorFatal(err)
 }
 
@@ -197,7 +194,7 @@ func init() {
  * This function creates a raft node and imports the persistent
  * state information to the node.
  */
-func setup_raft_node(id int, n_replicas int) *RaftNode {
+func setup_raft_node(ctx context.Context, id int, n_replicas int) *RaftNode {
 
 	// Key value store address of the current node
 	kv_addr := ":300" + strconv.Itoa(id)
@@ -206,7 +203,7 @@ func setup_raft_node(id int, n_replicas int) *RaftNode {
 	node := InitializeNode(int32(n_replicas), id, kv_addr)
 
 	// ApplyToStateMachine() is defined in raft_node.go
-	go node.ApplyToStateMachine()
+	go node.ApplyToStateMachine(ctx)
 
 	return node
 }
@@ -221,11 +218,7 @@ func setup_raft_node(id int, n_replicas int) *RaftNode {
  * The `connect_chan` channel is used to signify the end of execution of this
  * function for synchronization and error handling.
  */
-func (node *RaftNode) connect_raft_node(parent_ctx context.Context, id int, rep_addrs []string, testing bool, connect_chan chan bool) {
-
-	// Creating a master context for the whole raft application
-	ctx, _ := context.WithCancel(parent_ctx)
-	node.meta.master_ctx, node.meta.master_cancel = context.WithCancel(ctx)
+func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool, connect_chan chan bool) {
 
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
@@ -236,7 +229,6 @@ func (node *RaftNode) connect_raft_node(parent_ctx context.Context, id int, rep_
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
 	 * the HTTP server is up
 	 */
-
 	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
 
 	if !testing {
@@ -316,7 +308,9 @@ func main() {
 	var rid int
 	fmt.Scanf("%d", &rid)
 
-	node := setup_raft_node(rid, n_replica)
+	master_context, _ := context.WithCancel(context.Background())
+
+	node := setup_raft_node(master_context, rid, n_replica)
 
 	// Store the gRPC address of other replicas
 	rep_addrs := make([]string, n_replica)
