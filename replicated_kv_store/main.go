@@ -316,6 +316,9 @@ func main() {
 
 	node := setup_raft_node(master_context, rid, n_replica, false)
 
+	node.meta.master_ctx = master_context
+	node.meta.master_cancel = master_cancel
+
 	// Store the gRPC address of other replicas
 	rep_addrs := make([]string, n_replica)
 	for i := 0; i < n_replica; i++ {

@@ -166,12 +166,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 // HeartBeats is a goroutine that periodically makes leader
 // send heartbeats as long as it is the leader
-func (node *RaftNode) HeartBeats(parent_ctx context.Context) {
-
-	// Create a context for the heartbeat goroutine
-	ctx, cancel := context.WithCancel(parent_ctx)
-	_ = cancel
-	//defer cancel()
+func (node *RaftNode) HeartBeats(ctx context.Context) {
 
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
@@ -191,9 +186,9 @@ func (node *RaftNode) HeartBeats(parent_ctx context.Context) {
 				return
 			default:
 			}
-			//log.Println("\nasking for Rlock")
+
 			node.raft_node_mutex.RLock()
-			//log.Println("\ngot Rlock")
+
 			if node.state != Leader {
 
 				node.raft_node_mutex.RUnlock()

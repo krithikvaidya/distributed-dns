@@ -48,7 +48,7 @@ func start_test(t *testing.T, n int) *testing_st {
 	// Create the replicas
 	for i := 0; i < n; i++ {
 
-		new_test_st.nodes[i] = setup_raft_node(context.Background(), i, new_test_st.n, true)
+		new_test_st.nodes[i] = setup_raft_node(new_test_st.ctx_list[i], i, new_test_st.n, true)
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
@@ -58,8 +58,7 @@ func start_test(t *testing.T, n int) *testing_st {
 		// Create the context for the current node
 		new_test_st.ctx_list[i], new_test_st.cancel_list[i] = context.WithCancel(context.Background())
 
-		// Check
-		go new_test_st.nodes[i].connect_raft_node(context.Background(), i, new_test_st.rep_addrs, true)
+		go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true)
 
 		// Set the current node as active
 		new_test_st.active[i] = true

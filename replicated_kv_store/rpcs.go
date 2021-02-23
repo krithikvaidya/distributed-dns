@@ -64,12 +64,11 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	} else if node.currentTerm < in.Term {
 
 		// current term is lesser than received term, we transition into being a follower and reset timer and update term
-		node.ToFollower(context.Background(), in.Term) // CHECK
-
+		node.ToFollower(node.meta.master_ctx, in.Term)
 	} else if (node.currentTerm == in.Term) && (node.state == Candidate) {
 
 		// the election for the current term has been won by another replica, and this replica should step down from candidacy
-		node.ToFollower(context.Background(), in.Term) // CHECK
+		node.ToFollower(node.meta.master_ctx, in.Term)
 
 	}
 

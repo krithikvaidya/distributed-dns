@@ -36,6 +36,8 @@ type NodeMetadata struct {
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
 	shutdown_chan         chan string                     // Channel indicating termination of given module.
+	master_ctx            context.Context                 // A context derived from the master context for graceful shutdown
+	master_cancel         context.CancelFunc              // The cancel function for the above master context
 }
 
 // Main struct storing different aspects of the replica and it's state
