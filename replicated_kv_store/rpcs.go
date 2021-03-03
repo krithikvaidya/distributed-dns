@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -148,7 +149,9 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
+			start := time.Now()
 			node.persistToStorage()
+			log.Printf("\nPersisting raft state to storage took time %v", time.Since(start))
 
 			node.raft_node_mutex.Unlock()
 

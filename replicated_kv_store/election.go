@@ -15,7 +15,7 @@ import (
 func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 
 	// 150 - 300 ms random timeout was mentioned in the paper
-	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
+	duration := time.Duration(500+rand.Intn(200)) * time.Millisecond
 
 	/*
 	 * Make sure that election is not run when context is cancelled by prioritizing

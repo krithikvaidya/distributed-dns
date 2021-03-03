@@ -1,0 +1,136 @@
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+Restored Persisted Data:
+
+Restored currentTerm: 11
+Restored votedFor: -1
+Restored log: [{{{} [] [] <nil>} 0 [] 10 [NO-OP]  } {{{} [] [] <nil>} 0 [] 10 [POST ab abcd] a} {{{} [] [] <nil>} 0 [] 10 [POST abdd abcd] a} {{{} [] [] <nil>} 0 [] 10 [DELETE ab] } {{{} [] [] <nil>} 0 [] 11 [NO-OP]  } {{{} [] [] <nil>} 0 [] 11 [POST ab abcd] a}]
+Restored log length: 6
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+Election timer runs out.
+
+Received term: 12, My term: 12, My votedFor: 0
+
+Received latestLogIndex: 5, My latestLogIndex: 5, Received latestLogTerm: 11, My latestLogTerm: 11
+
+Granting vote
+
+Received term: 12, My term: 12, My votedFor: 0
+
+Received latestLogIndex: 5, My latestLogIndex: 5, Received latestLogTerm: 11, My latestLogTerm: 11
+
+Granting vote
+
+Received term: 12, My term: 12, My votedFor: 0
+
+Received latestLogIndex: 5, My latestLogIndex: 5, Received latestLogTerm: 11, My latestLogTerm: 11
+
+Granting vote
+
+Received term: 12, My term: 12, My votedFor: 0
+
+Received latestLogIndex: 5, My latestLogIndex: 5, Received latestLogTerm: 11, My latestLogTerm: 11
+
+Granting vote
+
+Transitioned to leader
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] gRPC server shutdown successful.
+[3/4] Client request listener shutdown successful.
+[4/4] KV store shutdown successful.
+
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+Election timer runs out.
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Transitioned to leader
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] KV store shutdown successful.
+[3/4] gRPC server shutdown successful.
+[4/4] Client request listener shutdown successful.
+
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+Election timer runs out.
+
+Election timer runs out.
+
+Election timer runs out.
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] gRPC server shutdown successful.
+[3/4] KV store shutdown successful.
+[4/4] Client request listener shutdown successful.
+

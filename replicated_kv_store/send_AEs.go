@@ -18,7 +18,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 	var err error
 
 	// Call the AppendEntries RPC for the given client
-	ctx, _ := context.WithTimeout(parent_ctx, 40*time.Millisecond)
+	ctx, _ := context.WithTimeout(parent_ctx, 100*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
@@ -168,7 +168,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 // send heartbeats as long as it is the leader
 func (node *RaftNode) HeartBeats(ctx context.Context) {
 
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	/*
