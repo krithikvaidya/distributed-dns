@@ -21,7 +21,7 @@ func resolve() {
 	fmt.Println(root_server)
 	keys := strings.Split(dns_name, ".")
 
-	url := fmt.Sprintf("%s/%s", root_server, keys[0])
+	url := fmt.Sprintf("%s:4000/%s", root_server, keys[0])
 	//keys[0] = .com / .net /.gov /.edu
 	resp, err := http.Get(url)
 	if err != nil {
@@ -56,7 +56,7 @@ func resolve() {
 		}
 
 		keys[i] = keys[i] + "." + keys[i-1] // example.com
-		url = fmt.Sprintf("%s/%s", name_server, keys[1])
+		url = fmt.Sprintf("%s:4000/%s", name_server, keys[1])
 
 		resp, err = http.Get(url)
 		if err != nil {
