@@ -99,5 +99,8 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 	node.raft_node_mutex.Unlock()
 	node.commits_ready <- 1
 
+	// Instruct the AWS load balancer to deregister previous leader and register us instead.
+	go node.LBRegister()
+
 	go node.HeartBeats(ctx)
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -91,5 +93,34 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 		log.Printf("\nTimeout expired, force shutdown invoked.\n")
 		return
 	}
+
+}
+
+func (node *RaftNode) LBRegister() {
+
+	// First, deregister all instances from LB (if we try to deregister an unregistered instance, AWS does nothing)
+
+	// Get load balancer ARN from env variable
+	lb_arn := os.Getenv("LB_ARN")
+
+	// Get aws instance IDs of all replicas in the cluster
+	id0 := os.Getenv("INST_ID_0")
+	id1 := os.Getenv("INST_ID_1")
+	id2 := os.Getenv("INST_ID_2")
+
+	target0 := "Id=" + id0
+	target1 := "Id=" + id1
+	target2 := "Id=" + id2
+
+	// Perform deregistration. TODO: error checking for commands?
+	cmd := exec.Command("aws", "elbv2", "deregister-targets", "--target-group-arn", lb_arn, "--targets", target0, target1, target2)
+	cmd.Output()
+
+	// Register self
+	iid := "INST_ID_" + strconv.Itoa(int(node.meta.replica_id))
+	target := "Id=" + os.Getenv(iid)
+
+	cmd = exec.Command("aws", "elbv2", "register-targets", "--target-group-arn", lb_arn, "--targets", target)
+	cmd.Output()
 
 }
