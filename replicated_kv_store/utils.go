@@ -98,15 +98,20 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 
 func (node *RaftNode) LBRegister() {
 
+	log.Println("IN LBRegister")
 	// First, deregister all instances from LB (if we try to deregister an unregistered instance, AWS does nothing)
 
 	// Get load balancer ARN from env variable
 	lb_arn := os.Getenv("LB_ARN")
+	log.Printf("LB_ARN: %v.\n", lb_arn)
 
 	// Get aws instance IDs of all replicas in the cluster
 	id0 := os.Getenv("INST_ID_0")
+	log.Printf("INST_ID_0: %v.\n", id0)
 	id1 := os.Getenv("INST_ID_1")
+	log.Printf("INST_ID_1: %v.\n", id1)
 	id2 := os.Getenv("INST_ID_2")
+	log.Printf("INST_ID_1: %v.\n", id2)
 
 	target0 := "Id=" + id0
 	target1 := "Id=" + id1
@@ -114,13 +119,27 @@ func (node *RaftNode) LBRegister() {
 
 	// Perform deregistration. TODO: error checking for commands?
 	cmd := exec.Command("aws", "elbv2", "deregister-targets", "--target-group-arn", lb_arn, "--targets", target0, target1, target2)
-	cmd.Output()
+	out, err := cmd.Output()
+
+	if err != nil {
+		log.Printf("Error occured in command1: %v\n", err.Error())
+		return
+	}
+
+	log.Printf("Output1: %v", out)
 
 	// Register self
 	iid := "INST_ID_" + strconv.Itoa(int(node.meta.replica_id))
 	target := "Id=" + os.Getenv(iid)
 
 	cmd = exec.Command("aws", "elbv2", "register-targets", "--target-group-arn", lb_arn, "--targets", target)
-	cmd.Output()
+	out, err = cmd.Output()
+
+	if err != nil {
+		log.Printf("Error occured in command2: %v\n", err.Error())
+		return
+	}
+
+	log.Printf("Output2: %v", out)
 
 }

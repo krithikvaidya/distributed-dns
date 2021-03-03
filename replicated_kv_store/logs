@@ -208,3 +208,33 @@ Termination signal received: interrupt
 [3/4] KV store shutdown successful.
 [4/4] Client request listener shutdown successful.
 
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+Restored Persisted Data:
+
+Restored currentTerm: 1
+Restored votedFor: 0
+Restored log: [{{{} [] [] <nil>} 0 [] 1 [NO-OP]  }]
+Restored log length: 1
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+Election timer runs out.
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] Client request listener shutdown successful.
+[3/4] gRPC server shutdown successful.
+[4/4] KV store shutdown successful.
+
