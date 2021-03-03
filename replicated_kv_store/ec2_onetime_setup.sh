@@ -16,7 +16,7 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip awscliv2.zip
 sudo ./aws/install
 
-# install go
+# install go. reference: https://github.com/canha/golang-tools-install-script
 wget -q -O - https://git.io/vQhTU | bash
 
 # set environment variables for this shell instance

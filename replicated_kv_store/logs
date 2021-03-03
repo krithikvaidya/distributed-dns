@@ -134,3 +134,77 @@ Termination signal received: interrupt
 [3/4] KV store shutdown successful.
 [4/4] Client request listener shutdown successful.
 
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] gRPC server shutdown successful.
+[3/4] KV store shutdown successful.
+[4/4] Client request listener shutdown successful.
+
+Raft-based Replicated Key Value Store
+Replica ID = 0
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+Starting raft replica server...
+
+Starting gRPC server at address :5000...
+
+Raft replica server up and listening at port :4000
+Node initialization successful
+
+Election timer runs out.
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Received term: 1, My term: 1, My votedFor: 0
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Granting vote
+
+Transitioned to leader
+
+
+Termination signal received: interrupt
+
+[1/4] ApplyToStateMachine shutdown successful.
+[2/4] gRPC server shutdown successful.
+[3/4] KV store shutdown successful.
+[4/4] Client request listener shutdown successful.
+

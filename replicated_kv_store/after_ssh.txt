@@ -1,0 +1,4 @@
+curl -L "https://gist.githubusercontent.com/krithikvaidya/a99c6beb27a3f85e8161073216f068c8/raw" --output ec2_onetime_setup.sh
+chmod +x ec2_onetime_setup.sh
+./ec2_onetime_setup.sh
+

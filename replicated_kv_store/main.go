@@ -212,7 +212,7 @@ func init() {
 func setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) *RaftNode {
 
 	// Key value store address of the current node
-	kv_addr := ":300" + strconv.Itoa(id)
+	kv_addr := ":3000"
 
 	// InitializeNode is defined in raft_node.go
 	node := InitializeNode(int32(n_replicas), id, kv_addr)
@@ -221,15 +221,14 @@ func setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 	go node.ApplyToStateMachine(ctx)
 
 	// Starting KV store
-	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
-	go node.StartKVStore(ctx, kvstore_addr, id)
+	go node.StartKVStore(ctx, kv_addr, id)
 
 	/*
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
 	 * the HTTP server is up
 	 */
-	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
+	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kv_addr)
 
 	if !testing {
 		for {
@@ -237,7 +236,7 @@ func setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 			_, err := http.Get(test_addr)
 
 			if err == nil {
-				log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
+				log.Printf("\nKey-value store up and listening at port %s\n", kv_addr)
 				break
 			}
 
@@ -268,7 +267,7 @@ func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs [
 	node.ConnectToPeerReplicas(ctx, rep_addrs)
 
 	// Setting up and running the gRPC server
-	grpc_address := ":500" + strconv.Itoa(id)
+	grpc_address := ":5000"
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", grpc_address)
 	CheckErrorFatal(err)
@@ -292,7 +291,7 @@ func (node *RaftNode) connect_raft_node(ctx context.Context, id int, rep_addrs [
 	// Now we can start listening to client requests
 
 	// Set up the server that listens for client requests.
-	server_address := ":400" + strconv.Itoa(id)
+	server_address := ":4000"
 	log.Println("Starting raft replica server...")
 	go node.StartRaftServer(ctx, server_address)
 
@@ -337,7 +336,7 @@ func main() {
 		}
 
 		rep_i_addr := "REP_" + strconv.Itoa(i) + "_GRPC_ADDR"
-		rep_addrs[i] = os.Getenv(rep_i_addr) + ":500" + strconv.Itoa(i)
+		rep_addrs[i] = os.Getenv(rep_i_addr) + ":5000"
 	}
 
 	// Perform steps necessary to setup the node as an active replica.
