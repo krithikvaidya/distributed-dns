@@ -103,7 +103,7 @@ func (node *RaftNode) LBRegister() {
 
 	// Get target group balancer ARN from env variable
 	tg_arn := os.Getenv("TG_ARN")
-	log.Printf("LB_ARN: %v.\n", lb_arn)
+	log.Printf("TG_ARN: %v.\n", tg_arn)
 
 	// Get aws instance IDs of all replicas in the cluster
 	id0 := os.Getenv("INST_ID_0")

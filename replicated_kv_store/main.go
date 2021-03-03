@@ -195,7 +195,7 @@ func init() {
 	log.SetFlags(0) // Turn off timestamps in log output.
 	rand.Seed(time.Now().UnixNano())
 
-	f, err := os.OpenFile("logs", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("node_logs", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
