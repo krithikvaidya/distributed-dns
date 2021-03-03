@@ -276,6 +276,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 			node.lastApplied = node.lastApplied + to_commit
 			node.persistToStorage()
 
+			log.Printf("\nApplyToStateMachine release lock.\n")
 			node.raft_node_mutex.Unlock()
 
 		}
