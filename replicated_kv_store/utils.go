@@ -101,8 +101,8 @@ func (node *RaftNode) LBRegister() {
 	log.Println("IN LBRegister")
 	// First, deregister all instances from LB (if we try to deregister an unregistered instance, AWS does nothing)
 
-	// Get load balancer ARN from env variable
-	lb_arn := os.Getenv("LB_ARN")
+	// Get target group balancer ARN from env variable
+	tg_arn := os.Getenv("TG_ARN")
 	log.Printf("LB_ARN: %v.\n", lb_arn)
 
 	// Get aws instance IDs of all replicas in the cluster
@@ -118,7 +118,7 @@ func (node *RaftNode) LBRegister() {
 	target2 := "Id=" + id2
 
 	// Perform deregistration. TODO: error checking for commands?
-	cmd := exec.Command("aws", "elbv2", "deregister-targets", "--target-group-arn", lb_arn, "--targets", target0, target1, target2)
+	cmd := exec.Command("aws", "elbv2", "deregister-targets", "--target-group-arn", tg_arn, "--targets", target0, target1, target2)
 	out, err := cmd.Output()
 
 	if err != nil {
@@ -132,7 +132,7 @@ func (node *RaftNode) LBRegister() {
 	iid := "INST_ID_" + strconv.Itoa(int(node.meta.replica_id))
 	target := "Id=" + os.Getenv(iid)
 
-	cmd = exec.Command("aws", "elbv2", "register-targets", "--target-group-arn", lb_arn, "--targets", target)
+	cmd = exec.Command("aws", "elbv2", "register-targets", "--target-group-arn", tg_arn, "--targets", target)
 	out, err = cmd.Output()
 
 	if err != nil {

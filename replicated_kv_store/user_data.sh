@@ -24,8 +24,8 @@ export REP_0_GRPC_ADDR=172.31.74.22  # fill in, eg: ec2-23-21-123-241.compute-1.
 export REP_1_GRPC_ADDR=172.31.78.208
 export REP_2_GRPC_ADDR=172.31.70.118
 
-# store ARN of respective load balancer.
-export LB_ARN=arn:aws:elasticloadbalancing:us-east-1:991577021500:loadbalancer/net/use1-root-lb/40476ec08960165f
+# store ARN of respective target group.
+export TG_ARN=arn:aws:elasticloadbalancing:us-east-1:991577021500:targetgroup/use1-root-tg/690a4ae0ae3d5f99
 
 # store instance IDs.
 export INST_ID_0=i-03e4aedd040c6675e
