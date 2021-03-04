@@ -10,34 +10,43 @@ import (
 )
 
 func main() {
+
 	fmt.Printf("Enter key: ")
 	var key, value string
-	fmt.Scanf("%s", key)
+	fmt.Scanf("%s", &key)
+
 	fmt.Printf("Enter the number of nameservers: ")
 	var n int
-	fmt.Scanf("%d", n)
+	fmt.Scanf("%d", &n)
+
 	var IPs = make([]string, n)
+
 	for i := 0; i < n; i++ {
 		fmt.Printf("Enter the IP of %d: ", i+1)
-		fmt.Scanf("%s", IPs[i])
+		fmt.Scanf("%s", &IPs[i])
 	}
+
 	var operation string
 	fmt.Printf("Enter the Operation to be performed: ")
-	fmt.Scanf("%s", operation)
+	fmt.Scanf("%s", &operation)
+
 	operation = strings.ToLower(operation)
 	if operation != "delete" {
 		fmt.Printf("Enter the new value to be stored: ")
-		fmt.Scanf("%s", value)
+		fmt.Scanf("%s", &value)
 	}
+
 	success := false
 	client := http.Client{}
 	for i := 0; i < n; i++ {
-		if operation == "create" || operation == "update" {
+
+		if operation == "update" {
+
 			formData := url.Values{
 				"value": {value},
 			}
 
-			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s:4000/%s", IPs[i], key), bytes.NewBufferString(formData.Encode()))
+			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://%s:4000/%s", IPs[i], key), bytes.NewBufferString(formData.Encode()))
 			if err != nil {
 				log.Printf("\nError in http.NewRequest: %v\n", err)
 				break
@@ -51,8 +60,25 @@ func main() {
 			}
 
 			resp.Body.Close()
+
+		} else if operation == "create" {
+
+			formData := url.Values{
+				"value": {value},
+			}
+
+			url := fmt.Sprintf(fmt.Sprintf("http://%s:4000/%s", IPs[i], key))
+			resp, err := http.PostForm(url, formData)
+
+			if err != nil {
+				log.Printf("\nError in client.Do: %v\n", err)
+				break
+			}
+
+			resp.Body.Close()
+
 		} else {
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s:4000/%s", IPs[i], key), nil)
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://%s:4000/%s", IPs[i], key), nil)
 			if err != nil {
 				log.Printf("\nError in http.NewRequest: %v\n", err)
 				break
