@@ -84,20 +84,42 @@ func main() {
 		resp.Body.Close()
 	}
 
-	arr2 := strings.Split(text, " ")
-	arr := strings.Split(arr2[len(arr2)-1], ",")
+	for { // continue resolving until "A" record or error is encountered
 
-	if strings.TrimSpace(arr2[len(arr2)-1]) == "pair" {
-		log.Fatalf("\nRecord not found\n")
-	}
+		arr2 := strings.Split(text, " ")
+		arr := strings.Split(arr2[len(arr2)-1], ",")
 
-	record := arr[0]
-	name_server := strings.TrimSpace(arr[1])
+		// TODO: key-value store returns unable to perform read: invalid key value pair
+		// when key is not found, change the message.
+		if strings.TrimSpace(arr2[len(arr2)-1]) == "pair" {
+			log.Fatalf("\nRecord not found\n")
+		}
 
-	fmt.Printf("\nResolver: Found %v record: %v\n", record, name_server)
+		record := arr[0]
+		name_server := strings.TrimSpace(arr[1])
 
-	if record == "A" {
-		fmt.Printf("\nFound A record: %s\n", name_server)
+		fmt.Printf("\nResolver: Found %v record: %v\n", record, name_server)
+
+		if record == "A" {
+			fmt.Printf("\nResult: Found A record: %s\n", name_server)
+			return
+		}
+
+		url = fmt.Sprintf("http://%s:4000/%s", name_server, keys[len(keys)-1])
+
+		resp, err = http.Get(url)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+
+		contents, err2 = ioutil.ReadAll(resp.Body)
+		if err2 != nil {
+			log.Fatalf("%v", err)
+		}
+
+		text = string(contents)
+		resp.Body.Close()
+
 	}
 
 }

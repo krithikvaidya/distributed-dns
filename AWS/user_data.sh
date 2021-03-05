@@ -19,8 +19,8 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 
-export REPLICA_ID=0
-export REP_0_GRPC_ADDR=  # fill in, eg: ec2-23-21-123-241.compute-1.amazonaws.com:5000
+export REPLICA_ID= # 0, 1, 2...
+export REP_0_GRPC_ADDR= # internal IP of replica 0
 export REP_1_GRPC_ADDR=
 export REP_2_GRPC_ADDR=
 
@@ -28,7 +28,7 @@ export REP_2_GRPC_ADDR=
 export TG_ARN=
 
 # store AWS instance IDs.
-export INST_ID_0=
+export INST_ID_0= # eg: i-016efc93518986add
 export INST_ID_1=
 export INST_ID_2=
 
