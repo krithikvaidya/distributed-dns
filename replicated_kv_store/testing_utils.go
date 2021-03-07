@@ -11,13 +11,13 @@ import (
 )
 
 type testing_st struct {
-	mu          sync.Mutex           // The mutex for performing operations on the struct
-	t           *testing.T           // The testing object for utility funcs to display errors
-	n           int                  // The number of nodes in the system
-	rep_addrs   []string             // The addresses of the replicas in the system
-	nodes       []*RaftNode          // The RaftNode objects of the individual replicas
-	active      []bool               // The status of each node, whether it is active(true) or not(false)
-	start       time.Time            // Time at which make_testing_st() was called
+	mu        sync.Mutex  // The mutex for performing operations on the struct
+	t         *testing.T  // The testing object for utility funcs to display errors
+	n         int         // The number of nodes in the system
+	rep_addrs []string    // The addresses of the replicas in the system
+	nodes     []*RaftNode // The RaftNode objects of the individual replicas
+	active    []bool      // The status of each node, whether it is active(true) or not(false)
+	start     time.Time   // Time at which make_testing_st() was called
 }
 
 /*
