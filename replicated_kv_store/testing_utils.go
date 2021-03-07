@@ -17,8 +17,6 @@ type testing_st struct {
 	rep_addrs   []string             // The addresses of the replicas in the system
 	nodes       []*RaftNode          // The RaftNode objects of the individual replicas
 	active      []bool               // The status of each node, whether it is active(true) or not(false)
-	ctx_list    []context.Context    // The list of contexts of all the raft nodes
-	cancel_list []context.CancelFunc // The list of cancel functions for the contexts
 	start       time.Time            // Time at which make_testing_st() was called
 }
 
@@ -42,23 +40,28 @@ func start_test(t *testing.T, n int) *testing_st {
 	new_test_st.nodes = make([]*RaftNode, n)
 	new_test_st.active = make([]bool, n)
 	new_test_st.rep_addrs = make([]string, n)
-	new_test_st.ctx_list = make([]context.Context, n)
-	new_test_st.cancel_list = make([]context.CancelFunc, n)
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
 
-		new_test_st.nodes[i] = setup_raft_node(new_test_st.ctx_list[i], i, new_test_st.n, true)
+		// Create the context for the current node
+		master_ctx, master_cancel := context.WithCancel(context.Background())
+
+		// Obtain the RaftNode object for the current node
+		new_test_st.nodes[i] = setup_raft_node(master_ctx, i, new_test_st.n, true)
+
+		// Set the master context and cancel entities in the node metadata struct
+		new_test_st.nodes[i].meta.master_ctx = master_ctx
+		new_test_st.nodes[i].meta.master_cancel = master_cancel
+
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
 
 	// Connect the replicas together to setup the system
 	for i := 0; i < n; i++ {
 
-		// Create the context for the current node
-		new_test_st.ctx_list[i], new_test_st.cancel_list[i] = context.WithCancel(context.Background())
-
-		go new_test_st.nodes[i].connect_raft_node(new_test_st.ctx_list[i], i, new_test_st.rep_addrs, true)
+		// Connect the current node to the system
+		go new_test_st.nodes[i].connect_raft_node(new_test_st.nodes[i].meta.master_ctx, i, new_test_st.rep_addrs, true)
 
 		// Set the current node as active
 		new_test_st.active[i] = true
@@ -77,7 +80,7 @@ func start_test(t *testing.T, n int) *testing_st {
  */
 func end_test(test_st *testing_st) {
 	for i := 0; i < test_st.n; i++ {
-		test_st.cancel_list[i]()
+		test_st.nodes[i].meta.master_cancel()
 	}
 }
 
@@ -95,7 +98,7 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	test_st.active[id] = false
 
 	// Cancel the context of the node to be crashed
-	test_st.cancel_list[id]()
+	test_st.nodes[id].meta.master_cancel()
 }
 
 /*
