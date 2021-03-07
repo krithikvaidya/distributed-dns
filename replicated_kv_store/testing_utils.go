@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -11,13 +14,13 @@ import (
 )
 
 type testing_st struct {
-	mu          sync.Mutex           // The mutex for performing operations on the struct
-	t           *testing.T           // The testing object for utility funcs to display errors
-	n           int                  // The number of nodes in the system
-	rep_addrs   []string             // The addresses of the replicas in the system
-	nodes       []*RaftNode          // The RaftNode objects of the individual replicas
-	active      []bool               // The status of each node, whether it is active(true) or not(false)
-	start       time.Time            // Time at which make_testing_st() was called
+	mu        sync.Mutex  // The mutex for performing operations on the struct
+	t         *testing.T  // The testing object for utility funcs to display errors
+	n         int         // The number of nodes in the system
+	rep_addrs []string    // The addresses of the replicas in the system
+	nodes     []*RaftNode // The RaftNode objects of the individual replicas
+	active    []bool      // The status of each node, whether it is active(true) or not(false)
+	start     time.Time   // Time at which make_testing_st() was called
 }
 
 /*
@@ -120,7 +123,7 @@ func (test_st *testing_st) count_leader() int {
 
 /*
  * This function is used to find the replica ID of the
- * cuurent leader node in the system.
+ * current leader node in the system.
  */
 func (test_st *testing_st) find_leader() int {
 	leader_id := -1
@@ -204,4 +207,55 @@ func (test_st *testing_st) check_consensus(index int) int {
 	}
 
 	return count
+}
+
+func (test_st *testing_st) restartRaftNode(id int) {
+
+	// Create the context for the node
+	master_ctx, master_cancel := context.WithCancel(context.Background())
+
+	// Obtain the RaftNode object for the node
+	test_st.nodes[id] = setup_raft_node(master_ctx, id, test_st.n, true)
+
+	// Set the master context and cancel entities in the node metadata struct
+	test_st.nodes[id].meta.master_ctx = master_ctx
+	test_st.nodes[id].meta.master_cancel = master_cancel
+
+	test_st.rep_addrs[id] = ":500" + strconv.Itoa(id)
+
+	// Connect the node to the system
+	go test_st.nodes[id].connect_raft_node(test_st.nodes[id].meta.master_ctx, id, test_st.rep_addrs, true)
+
+	// Set the node as active
+	test_st.active[id] = true
+}
+
+func (test_st *testing_st) addNewLogEntries(n int, t *testing.T, startIndex int) {
+	leader_id := test_st.find_leader()
+
+	if leader_id == -1 {
+		t.Errorf("Invalid leader ID %v", leader_id)
+	}
+	//get leader address
+	leader_addr := ":400" + strconv.Itoa(leader_id)
+
+	for i := startIndex; i < n+startIndex; i++ {
+
+		url := fmt.Sprintf("http://localhost%s/key%v", leader_addr, i)
+		body := strings.NewReader(fmt.Sprintf("value=value%v&client=admin", i))
+		req, err := http.NewRequest("POST", url, body)
+		if err != nil {
+			t.Errorf("Error in making request %v", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("Error in response %v", err)
+		}
+		resp.Body.Close()
+
+		// Allow entries to be added
+		time.Sleep(2 * time.Second)
+	}
 }
