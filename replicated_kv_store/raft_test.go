@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -45,7 +49,7 @@ func TestInitialElection(t *testing.T) {
  * 4. After a few seconds, the number of leaders in the system is checked
  * using `count_leader()`. If it is 1, test passes.
  */
- func TestReElection(t *testing.T) {
+func TestReElection(t *testing.T) {
 	n := 5
 	test_sys := start_test(t, n)
 
@@ -69,6 +73,52 @@ func TestInitialElection(t *testing.T) {
 	no_of_leaders := test_sys.count_leader()
 	if no_of_leaders != 1 {
 		t.Errorf("Invalid number of leaders %v, expected 1", no_of_leaders)
+	}
+
+	end_test(test_sys)
+}
+
+/*
+This test checks if all nodes have same entry in the log
+after sending a command
+*/
+func TestBasicAgreement(t *testing.T) {
+	n := 5
+	test_sys := start_test(t, n)
+
+	//time for nodes to elect a leader
+	time.Sleep(5 * time.Second)
+
+	//get leader id
+	leader_id := test_sys.find_leader()
+
+	if leader_id == -1 {
+		t.Errorf("Invalid leader ID %v", leader_id)
+	}
+	//get leader address
+	leader_addr := ":400" + strconv.Itoa(leader_id)
+
+	url := fmt.Sprintf("http://localhost%s/key1", leader_addr)
+	body := strings.NewReader(`value=value1&client=admin`)
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		t.Errorf("Error in making request %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Errorf("Error in response %v", err)
+	}
+	resp.Body.Close()
+
+	// Allow entries to be added
+	time.Sleep(2 * time.Second)
+	//find how many nodes agree at index 1
+	agreeCount := test_sys.check_consensus(1)
+	// if all don't agree
+	if agreeCount != n {
+		t.Errorf("only %v nodes agree on log entry", agreeCount)
 	}
 
 	end_test(test_sys)
