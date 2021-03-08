@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"os"
 
 	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
 )
@@ -80,7 +81,21 @@ func start_test(t *testing.T, n int) *testing_st {
  */
 func end_test(test_st *testing_st) {
 	for i := 0; i < test_st.n; i++ {
+		// Cancel the master contexts of each of the nodes
 		test_st.nodes[i].meta.master_cancel()
+
+		/*
+		 * Remove the persistent files
+		 *
+		 * Here, the filenames starting with `600` and ending with
+		 * the id of the node represent the kv store files and the files
+		 * starting with `300` and ending with the id of the node represent
+		 * the files storing the raft persistent information.
+		 */
+		fname_kv_store := "600" + strconv.Itoa(i)
+		fname_raft_persistent := "300" + strconv.Itoa(i)
+		os.Remove(fname_kv_store)
+		os.Remove(fname_raft_persistent)
 	}
 }
 
@@ -89,6 +104,9 @@ func end_test(test_st *testing_st) {
  * in the current system by disconnecting it with other
  * nodes and then killing the various services on the
  * node.
+ *
+ * Note that crashing a node doesnt involve removing the
+ * persistent data stored on it.
  */
 func (test_st *testing_st) crash_raft_node(id int) {
 	// Save the current status in persistent storage
