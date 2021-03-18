@@ -116,6 +116,11 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 			continue
 		}
 
+		if client_obj == nil {
+			replica_id++
+			continue
+		}
+
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.Lock()

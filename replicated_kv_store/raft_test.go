@@ -169,3 +169,33 @@ func TestBasicAgreement(t *testing.T) {
 
 	end_test(test_sys)
 }
+
+func TestLeaderPartition(t *testing.T) {
+	n := 5
+	test_sys := start_test(t, n)
+
+	//time for nodes to elect a leader
+	time.Sleep(5 * time.Second)
+
+	//get leader id
+	leader_id := test_sys.find_leader()
+
+	//Disconnect Leader and
+	//then wait for new leader to be elected
+	test_sys.disconnect(leader_id)
+	time.Sleep(5 * time.Second)
+
+	//Connect the old leader back
+	//Wait for leader conflicts to be resolved
+	test_sys.connect(leader_id)
+	time.Sleep(5 * time.Second)
+
+	//Check how many leaders are there
+	num_leaders := test_sys.count_leader()
+
+	if num_leaders != 1 {
+		t.Errorf("Invalid number of leaders %v, expected 1", num_leaders)
+	}
+
+	end_test(test_sys)
+}

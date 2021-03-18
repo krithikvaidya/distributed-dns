@@ -287,3 +287,24 @@ func (test_st *testing_st) disconnect(index int) {
 		}
 	}
 }
+
+func (test_st *testing_st) connect(index int) {
+	for i := int32(0); i < test_st.nodes[index].meta.n_replicas; i++ {
+
+		if i == test_st.nodes[index].meta.replica_id {
+			continue
+		}
+
+		//outgoing connections
+		//get saved ones from backup
+		if test_st.nodes[index].meta.peer_replica_clients[i] == nil {
+			test_st.nodes[index].meta.peer_replica_clients[i] = test_st.backup[index].vertices[i]
+		}
+
+		//incoming connections
+		//get saved ones from backup
+		if test_st.nodes[i].meta.peer_replica_clients[index] == nil {
+			test_st.nodes[i].meta.peer_replica_clients[index] = test_st.backup[i].vertices[index]
+		}
+	}
+}
