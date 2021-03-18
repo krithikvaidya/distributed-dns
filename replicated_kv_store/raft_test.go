@@ -79,6 +79,52 @@ func TestReElection(t *testing.T) {
 }
 
 /*
+* This test case checks whether the leader conflict after restarting the crashed
+* leader node after re-election works as intended.  *
+* The procedure is:
+* 1. It sets up the system by calling `start_test()`
+* 2. After this connection has been set up, the function `find_leader()` is
+* used to find the current leader in the system, after the first election.
+* 3. The leader, if exists, is crashed using `crash_raft_node()`.
+* 4. Time is given to allow re-election of leader.
+* 5. The crashed Leader Node is then restarted using `restart_raft_node`.
+* 6. After a few seconds, the number of leaders in the system is checked
+* using `count_leader()`. If it is 1, leader conflict is resolved & test passes.
+ */
+func TestLeaderRestartAfterReElection(t *testing.T) {
+	n := 5
+	test_sys := start_test(t, n)
+
+	// Allow time for initial election
+	time.Sleep(5 * time.Second)
+
+	// Find the current leader
+	curr_leader_id := test_sys.find_leader()
+
+	// If a leader exists, crash that node
+	if curr_leader_id != -1 {
+		test_sys.crash_raft_node(curr_leader_id)
+	} else {
+		t.Errorf("Invalid leader ID %v", curr_leader_id)
+	}
+
+	// Allow time for re-election
+	time.Sleep(5 * time.Second)
+	// Restart the crashed leader node
+	test_sys.restart_raft_node(curr_leader_id)
+	//Allow time for leader conflicts to be resolved
+	time.Sleep(2 * time.Second)
+
+	// Check number of leaders after re-election
+	no_of_leaders := test_sys.count_leader()
+	if no_of_leaders != 1 {
+		t.Errorf("Invalid number of leaders %v, expected 1", no_of_leaders)
+	}
+
+	end_test(test_sys)
+}
+
+/*
 This test checks if all nodes have same entry in the log
 after sending a command
 */

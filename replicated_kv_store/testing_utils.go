@@ -132,6 +132,27 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	test_st.nodes[id].meta.master_cancel()
 }
 
+func (test_st *testing_st) restart_raft_node(id int) {
+
+	// Create the context for the node
+	master_ctx, master_cancel := context.WithCancel(context.Background())
+
+	// Obtain the RaftNode object for the node
+	test_st.nodes[id] = setup_raft_node(master_ctx, id, test_st.n, true)
+
+	// Set the master context and cancel entities in the node metadata struct
+	test_st.nodes[id].meta.master_ctx = master_ctx
+	test_st.nodes[id].meta.master_cancel = master_cancel
+
+	test_st.rep_addrs[id] = ":500" + strconv.Itoa(id)
+
+	// Connect the node to the system
+	go test_st.nodes[id].connect_raft_node(test_st.nodes[id].meta.master_ctx, id, test_st.rep_addrs, true)
+
+	// Set the node as active
+	test_st.active[id] = true
+}
+
 /*
  * This function can be called to find the number of
  * active nodes with the states as 'Leader'
