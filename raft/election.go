@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 // RunElectionTimer runs an election and initiates transition to candidate

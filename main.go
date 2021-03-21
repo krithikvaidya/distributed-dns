@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft"
-
+	"github.com/krithikvaidya/distributed-dns/raft"
 )
 
 var n_replica int

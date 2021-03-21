@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 type Storage struct {

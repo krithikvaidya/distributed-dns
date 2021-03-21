@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {

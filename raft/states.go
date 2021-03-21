@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 // ToFollower is called when you get a term higher than your own

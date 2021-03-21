@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 //WriteCommand is called when the client sends the replica a write request.

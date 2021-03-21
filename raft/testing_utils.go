@@ -2,13 +2,13 @@ package raft
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
-	"os"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
 type testing_st struct {

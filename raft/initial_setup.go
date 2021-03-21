@@ -11,8 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/kv_store"
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
+	"github.com/krithikvaidya/distributed-dns/raft/kv_store"
+	"github.com/krithikvaidya/distributed-dns/raft/protos"
 
 	"google.golang.org/grpc"
 )
