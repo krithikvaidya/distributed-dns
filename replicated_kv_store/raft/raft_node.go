@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
 	"google.golang.org/grpc"
 )
 
@@ -36,8 +36,8 @@ type NodeMetadata struct {
 	nodeAddress           string                          // Address of our node
 	latestClient          string                          // Address of client that made latest write request
 	shutdown_chan         chan string                     // Channel indicating termination of given module.
-	master_ctx            context.Context                 // A context derived from the master context for graceful shutdown
-	master_cancel         context.CancelFunc              // The cancel function for the above master context
+	Master_ctx            context.Context                 // A context derived from the master context for graceful shutdown
+	Master_cancel         context.CancelFunc              // The cancel function for the above master context
 }
 
 // Main struct storing different aspects of the replica and it's state
@@ -45,7 +45,7 @@ type NodeMetadata struct {
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 
-	meta *NodeMetadata
+	Meta *NodeMetadata
 
 	raft_node_mutex sync.RWMutex // The mutex for working with the RaftNode struct
 
@@ -107,9 +107,9 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 		shutdown_chan: make(chan string),
 	}
 
-	raft_node.meta = meta
+	raft_node.Meta = meta
 
-	if raft_node.storage.HasData(raft_node.meta.raft_persistence_file) {
+	if raft_node.storage.HasData(raft_node.Meta.raft_persistence_file) {
 
 		raft_node.restoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
@@ -129,15 +129,15 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
 	// The clients for each corresponding server is stored in client_objs.
-	client_objs := make([]protos.ConsensusServiceClient, node.meta.n_replicas)
+	client_objs := make([]protos.ConsensusServiceClient, node.Meta.n_replicas)
 
 	// NOTE: even if the grpc Dial to a given server fails the first time, the client stub can still be obtained.
 	// RPC requests using such client stubs will succeed when the connection can be established to
 	// the gRPC server.
 
-	for i := int32(0); i < node.meta.n_replicas; i++ {
+	for i := int32(0); i < node.Meta.n_replicas; i++ {
 
-		if i == node.meta.replica_id {
+		if i == node.Meta.replica_id {
 			continue
 		}
 
@@ -150,7 +150,7 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 		client_objs[i] = cli
 	}
 
-	node.meta.peer_replica_clients = client_objs
+	node.Meta.peer_replica_clients = client_objs
 
 	// Check what the persisted state was (if any), and accordingly proceed
 	node.raft_node_mutex.Lock()
@@ -189,7 +189,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 		select {
 
 		case <-ctx.Done():
-			node.meta.shutdown_chan <- "ApplyToStateMachine shutdown successful."
+			node.Meta.shutdown_chan <- "ApplyToStateMachine shutdown successful."
 			return
 
 		case to_commit := <-node.commits_ready:
@@ -215,7 +215,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 						"value": {entry.Operation[2]},
 					}
 
-					url := fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1])
+					url := fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, entry.Operation[1])
 					resp, err := http.PostForm(url, formData)
 
 					if err != nil {
@@ -231,7 +231,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 						"value": {entry.Operation[2]},
 					}
 
-					req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
+					req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 					if err != nil {
 						log.Printf("\nError in http.NewRequest: %v\n", err)
 						continue
@@ -248,7 +248,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 				case "DELETE":
 
-					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, entry.Operation[1]), nil)
+					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, entry.Operation[1]), nil)
 					if err != nil {
 						log.Printf("\nError in http.NewRequest: %v\n", err)
 						continue

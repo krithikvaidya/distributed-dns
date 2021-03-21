@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"time"
 	"os"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
 )
 
 type testing_st struct {
@@ -49,11 +49,11 @@ func start_test(t *testing.T, n int) *testing_st {
 		master_ctx, master_cancel := context.WithCancel(context.Background())
 
 		// Obtain the RaftNode object for the current node
-		new_test_st.nodes[i] = setup_raft_node(master_ctx, i, new_test_st.n, true)
+		new_test_st.nodes[i] = Setup_raft_node(master_ctx, i, new_test_st.n, true)
 
 		// Set the master context and cancel entities in the node metadata struct
-		new_test_st.nodes[i].meta.master_ctx = master_ctx
-		new_test_st.nodes[i].meta.master_cancel = master_cancel
+		new_test_st.nodes[i].Meta.Master_ctx = master_ctx
+		new_test_st.nodes[i].Meta.Master_cancel = master_cancel
 
 		new_test_st.rep_addrs[i] = ":500" + strconv.Itoa(i)
 	}
@@ -62,7 +62,7 @@ func start_test(t *testing.T, n int) *testing_st {
 	for i := 0; i < n; i++ {
 
 		// Connect the current node to the system
-		go new_test_st.nodes[i].connect_raft_node(new_test_st.nodes[i].meta.master_ctx, i, new_test_st.rep_addrs, true)
+		go new_test_st.nodes[i].Connect_raft_node(new_test_st.nodes[i].Meta.Master_ctx, i, new_test_st.rep_addrs, true)
 
 		// Set the current node as active
 		new_test_st.active[i] = true
@@ -82,7 +82,7 @@ func start_test(t *testing.T, n int) *testing_st {
 func end_test(test_st *testing_st) {
 	for i := 0; i < test_st.n; i++ {
 		// Cancel the master contexts of each of the nodes
-		test_st.nodes[i].meta.master_cancel()
+		test_st.nodes[i].Meta.Master_cancel()
 
 		/*
 		 * Remove the persistent files
@@ -116,7 +116,7 @@ func (test_st *testing_st) crash_raft_node(id int) {
 	test_st.active[id] = false
 
 	// Cancel the context of the node to be crashed
-	test_st.nodes[id].meta.master_cancel()
+	test_st.nodes[id].Meta.Master_cancel()
 }
 
 func (test_st *testing_st) restart_raft_node(id int) {
@@ -125,16 +125,16 @@ func (test_st *testing_st) restart_raft_node(id int) {
 	master_ctx, master_cancel := context.WithCancel(context.Background())
 
 	// Obtain the RaftNode object for the node
-	test_st.nodes[id] = setup_raft_node(master_ctx, id, test_st.n, true)
+	test_st.nodes[id] = Setup_raft_node(master_ctx, id, test_st.n, true)
 
 	// Set the master context and cancel entities in the node metadata struct
-	test_st.nodes[id].meta.master_ctx = master_ctx
-	test_st.nodes[id].meta.master_cancel = master_cancel
+	test_st.nodes[id].Meta.Master_ctx = master_ctx
+	test_st.nodes[id].Meta.Master_cancel = master_cancel
 
 	test_st.rep_addrs[id] = ":500" + strconv.Itoa(id)
 
 	// Connect the node to the system
-	go test_st.nodes[id].connect_raft_node(test_st.nodes[id].meta.master_ctx, id, test_st.rep_addrs, true)
+	go test_st.nodes[id].Connect_raft_node(test_st.nodes[id].Meta.Master_ctx, id, test_st.rep_addrs, true)
 
 	// Set the node as active
 	test_st.active[id] = true

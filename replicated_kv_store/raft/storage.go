@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"encoding/gob"
@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
 )
 
 type Storage struct {
@@ -103,31 +103,31 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 
 	var t1, t2, t3, t4, t5 interface{}
 
-	if t1, check = node.storage.Get("currentTerm", node.meta.raft_persistence_file); !check {
+	if t1, check = node.storage.Get("currentTerm", node.Meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but currentTerm not found in storage\n")
 	}
 
 	node.currentTerm = t1.(int32)
 
-	if t2, check = node.storage.Get("votedFor", node.meta.raft_persistence_file); !check {
+	if t2, check = node.storage.Get("votedFor", node.Meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but votedFor not found in storage\n")
 	}
 
 	node.votedFor = t2.(int32)
 
-	if t3, check = node.storage.Get("log", node.meta.raft_persistence_file); !check {
+	if t3, check = node.storage.Get("log", node.Meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but log not found in storage\n")
 	}
 
 	node.log = t3.([]protos.LogEntry)
 
-	if t4, check = node.storage.Get("commitIndex", node.meta.raft_persistence_file); !check {
+	if t4, check = node.storage.Get("commitIndex", node.Meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but commitIndex not found in storage\n")
 	}
 
 	node.commitIndex = t4.(int32)
 
-	if t5, check = node.storage.Get("lastApplied", node.meta.raft_persistence_file); !check {
+	if t5, check = node.storage.Get("lastApplied", node.Meta.raft_persistence_file); !check {
 		log.Fatalf("\nFatal: persisted data found, but lastApplied not found in storage\n")
 	}
 
@@ -142,6 +142,6 @@ func (node *RaftNode) persistToStorage() {
 	node.storage.Set("commitIndex", node.commitIndex)
 	node.storage.Set("lastApplied", node.lastApplied)
 
-	node.storage.WriteFile(node.meta.raft_persistence_file)
+	node.storage.WriteFile(node.Meta.raft_persistence_file)
 
 }

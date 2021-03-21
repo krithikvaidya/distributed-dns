@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
 	"google.golang.org/grpc"
 )
 
@@ -31,7 +31,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 		// Obtain client stub
 		cli := protos.NewConsensusServiceClient(connxn)
 
-		node.meta.peer_replica_clients[replica_id] = cli
+		node.Meta.peer_replica_clients[replica_id] = cli
 
 		// Call the AppendEntries RPC for the given client
 		ctx, _ := context.WithTimeout(parent_ctx, 20*time.Millisecond)
@@ -77,13 +77,13 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 		new_msg := &protos.AppendEntriesMessage{
 
 			Term:         node.currentTerm,
-			LeaderId:     node.meta.replica_id,
+			LeaderId:     node.Meta.replica_id,
 			PrevLogIndex: prevLogIndex,
 			PrevLogTerm:  prevLogTerm,
 			LeaderCommit: node.commitIndex,
 			Entries:      entries,
-			LeaderAddr:   node.meta.nodeAddress,
-			LatestClient: node.meta.latestClient,
+			LeaderAddr:   node.Meta.nodeAddress,
+			LatestClient: node.Meta.latestClient,
 		}
 
 		return node.LeaderSendAE(parent_ctx, replica_id, upper_index, client_obj, new_msg)
@@ -109,9 +109,9 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 	failures := int32(0)
 
-	for _, client_obj := range node.meta.peer_replica_clients {
+	for _, client_obj := range node.Meta.peer_replica_clients {
 
-		if replica_id == node.meta.replica_id {
+		if replica_id == node.Meta.replica_id {
 			replica_id++
 			continue
 		}
@@ -142,14 +142,14 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 				tot_success := atomic.AddInt32(&successes, 1)
 
-				if tot_success == (node.meta.n_replicas)/2+1 { // write quorum achieved
+				if tot_success == (node.Meta.n_replicas)/2+1 { // write quorum achieved
 					successful_write <- true // indicate to the calling function that the operation was perform successfully.
 				}
 
 			} else {
 				tot_fail := atomic.AddInt32(&failures, 1)
 
-				if tot_fail == (node.meta.n_replicas+1)/2 {
+				if tot_fail == (node.Meta.n_replicas+1)/2 {
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
@@ -198,10 +198,10 @@ func (node *RaftNode) HeartBeats(ctx context.Context) {
 			hbeat_msg := &protos.AppendEntriesMessage{
 
 				Term:         node.currentTerm,
-				LeaderId:     node.meta.replica_id,
+				LeaderId:     node.Meta.replica_id,
 				LeaderCommit: node.commitIndex,
-				LeaderAddr:   node.meta.nodeAddress,
-				LatestClient: node.meta.latestClient,
+				LeaderAddr:   node.Meta.nodeAddress,
+				LatestClient: node.Meta.latestClient,
 			}
 
 			node.raft_node_mutex.RUnlock()

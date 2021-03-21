@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"context"
@@ -61,7 +61,7 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 	master_cancel()
 
 	select {
-	case str := <-node.meta.shutdown_chan:
+	case str := <-node.Meta.shutdown_chan:
 		log.Printf("\n[1/4] %v", str)
 	case <-time.After(5 * time.Second):
 		log.Printf("\nTimeout expired, force shutdown invoked.\n")
@@ -69,7 +69,7 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 	}
 
 	select {
-	case str := <-node.meta.shutdown_chan:
+	case str := <-node.Meta.shutdown_chan:
 		log.Printf("[2/4] %v", str)
 	case <-time.After(5 * time.Second):
 		log.Printf("\nTimeout expired, force shutdown invoked.\n")
@@ -77,7 +77,7 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 	}
 
 	select {
-	case str := <-node.meta.shutdown_chan:
+	case str := <-node.Meta.shutdown_chan:
 		log.Printf("[3/4] %v", str)
 	case <-time.After(5 * time.Second):
 		log.Printf("\nTimeout expired, force shutdown invoked.\n")
@@ -85,7 +85,7 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 	}
 
 	select {
-	case str := <-node.meta.shutdown_chan:
+	case str := <-node.Meta.shutdown_chan:
 		log.Printf("[4/4] %v\n\n", str)
 	case <-time.After(5 * time.Second):
 		log.Printf("\nTimeout expired, force shutdown invoked.\n")

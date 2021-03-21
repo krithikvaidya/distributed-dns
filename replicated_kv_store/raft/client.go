@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/protos"
+	"github.com/krithikvaidya/distributed-dns/replicated_kv_store/raft/protos"
 )
 
 //WriteCommand is called when the client sends the replica a write request.
@@ -46,7 +46,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	 */
 	if val && operation[0] != "DELETE" {
 		equal = reflect.DeepEqual(lastClientOper, operation)
-		equal = equal && client == node.meta.latestClient
+		equal = equal && client == node.Meta.latestClient
 	}
 
 	if equal {
@@ -72,7 +72,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 		node.raft_node_mutex.Lock()
 	}
 
-	node.meta.latestClient = client
+	node.Meta.latestClient = client
 
 	var entries []*protos.LogEntry
 	entries = append(entries, &node.log[len(node.log)-1])
@@ -80,10 +80,10 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.meta.replica_id,
+		LeaderId:     node.Meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LatestClient: node.meta.latestClient,
-		LeaderAddr:   node.meta.nodeAddress,
+		LatestClient: node.Meta.latestClient,
+		LeaderAddr:   node.Meta.nodeAddress,
 	}
 
 	//append to local log
@@ -134,7 +134,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 		// assuming that if an operation on the state machine succeeds on one of the replicas,
 		// it will succeed on all. and vice versa.
-		url := fmt.Sprintf("http://localhost%s/%s", node.meta.kvstore_addr, key)
+		url := fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, key)
 
 		resp, err := http.Get(url)
 
@@ -170,10 +170,10 @@ func (node *RaftNode) StaleReadCheck(heartbeat_success chan bool) {
 	hbeat_msg := &protos.AppendEntriesMessage{
 
 		Term:         node.currentTerm,
-		LeaderId:     node.meta.replica_id,
+		LeaderId:     node.Meta.replica_id,
 		LeaderCommit: node.commitIndex,
-		LatestClient: node.meta.latestClient,
-		LeaderAddr:   node.meta.nodeAddress,
+		LatestClient: node.Meta.latestClient,
+		LeaderAddr:   node.Meta.nodeAddress,
 	}
 
 	node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), heartbeat_success)
