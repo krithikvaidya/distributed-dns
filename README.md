@@ -1,5 +1,7 @@
 # Distributed DNS
 
+[![](https://godoc.org/github.com/krithikvaidya/distributed-dns?status.svg)](https://godoc.org/github.com/krithikvaidya/distributed-dns)
+
 A repository containing our learnings and implementations for the project "Distributed DNS in the Cloud" under IEEE-NITK (Work in Progress)
 
 Material Related to Learning Phase - [Repo](https://github.com/krithikvaidya/distdns-learning)
