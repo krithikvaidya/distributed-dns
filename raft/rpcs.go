@@ -55,11 +55,41 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
+	defer node.raft_node_mutex.Unlock()
 
 	// term received is lesser than current term.
 	if node.currentTerm > in.Term {
-		node.raft_node_mutex.Unlock()
-		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+
+		// check if the logs were replicated earlier
+		// check if entry at PrevLogIndex (if it exists) has term PrevLogTerm. If yes, chec
+		// if the logs match.
+		if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
+
+			entryIndex := 0
+
+			for logIndex := int(in.PrevLogIndex + 1); (entryIndex < len(in.Entries)) && (logIndex < len(node.log)); logIndex++ {
+
+				// we start from prevlogindex and try to find the first mismatch, if any
+				if node.log[logIndex].Term != in.Entries[entryIndex].Term {
+					break
+				}
+
+				entryIndex++
+
+			}
+
+			// if entryIndex has reached the end of the entries received in the message, then all the logs received in the
+			// message have been replicated.
+			if entryIndex == len(in.Entries) {
+				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
+			} else {
+				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+			}
+
+		} else {
+			// entry at PrevLogIndex does not have term PrevLogTerm
+			return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
+		}
 
 	} else if node.currentTerm < in.Term {
 
@@ -78,7 +108,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	node.Meta.leaderAddress = in.LeaderAddr // gets the leaders address
 
-	// we that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
+	// we ensure that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 
 		//log.Printf("\nin.PrevLogIndex : %d, in.PrevLogTerm : %d\n", in.PrevLogIndex, in.PrevLogTerm)
@@ -150,20 +180,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			}
 			node.persistToStorage()
 
-			node.raft_node_mutex.Unlock()
-
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
-		} else {
-
-			node.raft_node_mutex.Unlock()
 		}
 
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-
-		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil
 

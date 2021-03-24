@@ -34,14 +34,16 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 		node.Meta.peer_replica_clients[replica_id] = cli
 
 		// Call the AppendEntries RPC for the given client
-		ctx, _ := context.WithTimeout(parent_ctx, 20*time.Millisecond)
+		ctx, _ := context.WithTimeout(parent_ctx, 40*time.Millisecond)
 		response, err = client_obj.AppendEntries(ctx, msg)
 
 		if err != nil {
-			// log.Printf("\nReturning false because: %v\n", err)
 			return false
 		}
 	}
+
+	node.raft_node_mutex.Lock()
+	defer node.raft_node_mutex.Unlock()
 
 	if response.Success == false {
 
@@ -53,7 +55,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 		if response.Term > node.currentTerm {
 
 			node.ToFollower(parent_ctx, response.Term)
-			log.Printf("\nReturning false in LeaderSendAE because: response.Term > node.currentTerm\n")
+			log.Printf("\nReturning false in LeaderSendAE because: response.Term > node.currentTerm and logs have not been replicated earlier.\n")
 			return false
 		}
 
@@ -88,11 +90,18 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 
 		return node.LeaderSendAE(parent_ctx, replica_id, upper_index, client_obj, new_msg)
 
-	} else {
+	} else { //response.Success == true
 
-		// AppendEntries for given client successful.
-		node.nextIndex[replica_id] = upper_index + 1
-		node.matchIndex[replica_id] = upper_index
+		if node.currentTerm < response.Term {
+
+			node.ToFollower(parent_ctx, response.Term)
+
+		} else {
+
+			node.nextIndex[replica_id] = upper_index + 1
+			node.matchIndex[replica_id] = upper_index
+
+		}
 
 		return true
 
@@ -118,7 +127,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
-			node.raft_node_mutex.Lock()
+			node.raft_node_mutex.RLock()
 			//log.Printf("Lock on %d", replica_id)
 			prevLogIndex := node.nextIndex[replica_id] - 1
 			prevLogTerm := int32(-1)
@@ -136,9 +145,13 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 				entries = append(entries, &node.log[i])
 			}
 
+			node.raft_node_mutex.RUnlock()
+
 			msg.Entries = entries
 
-			if node.LeaderSendAE(context.Background(), replica_id, upper_index, client_obj, msg) {
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+
+			if node.LeaderSendAE(ctx, replica_id, upper_index, client_obj, msg) {
 
 				tot_success := atomic.AddInt32(&successes, 1)
 
@@ -153,8 +166,6 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 					successful_write <- false // indicate to the calling function that the operation failed.
 				}
 			}
-
-			node.raft_node_mutex.Unlock()
 
 		}(node, client_obj, replica_id, upper_index, successful_write)
 
