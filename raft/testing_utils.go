@@ -264,47 +264,47 @@ want the node to rejoin again */
 
 func (test_st *testing_st) disconnect(index int) {
 
-	for i := int32(0); i < test_st.nodes[index].meta.n_replicas; i++ {
+	for i := int32(0); i < test_st.nodes[index].Meta.n_replicas; i++ {
 
-		if i == test_st.nodes[index].meta.replica_id {
+		if i == test_st.nodes[index].Meta.replica_id {
 			continue
 		}
 
 		//outgoing connections
 		//store in backup before deleting only if connection is not nil
 		//otherwise backup will lose original connection
-		if test_st.nodes[index].meta.peer_replica_clients[i] != nil {
-			test_st.backup[index].vertices[i] = test_st.nodes[index].meta.peer_replica_clients[i]
-			test_st.nodes[index].meta.peer_replica_clients[i] = nil
+		if test_st.nodes[index].Meta.peer_replica_clients[i] != nil {
+			test_st.backup[index].vertices[i] = test_st.nodes[index].Meta.peer_replica_clients[i]
+			test_st.nodes[index].Meta.peer_replica_clients[i] = nil
 		}
 
 		//incoming connections
 		//store in backup before deleting only if connection is not nil
 		//otherwise backup will lose original connection
-		if test_st.nodes[i].meta.peer_replica_clients[index] != nil {
-			test_st.backup[i].vertices[index] = test_st.nodes[i].meta.peer_replica_clients[index]
-			test_st.nodes[i].meta.peer_replica_clients[index] = nil
+		if test_st.nodes[i].Meta.peer_replica_clients[index] != nil {
+			test_st.backup[i].vertices[index] = test_st.nodes[i].Meta.peer_replica_clients[index]
+			test_st.nodes[i].Meta.peer_replica_clients[index] = nil
 		}
 	}
 }
 
 func (test_st *testing_st) connect(index int) {
-	for i := int32(0); i < test_st.nodes[index].meta.n_replicas; i++ {
+	for i := int32(0); i < test_st.nodes[index].Meta.n_replicas; i++ {
 
-		if i == test_st.nodes[index].meta.replica_id {
+		if i == test_st.nodes[index].Meta.replica_id {
 			continue
 		}
 
 		//outgoing connections
 		//get saved ones from backup
-		if test_st.nodes[index].meta.peer_replica_clients[i] == nil {
-			test_st.nodes[index].meta.peer_replica_clients[i] = test_st.backup[index].vertices[i]
+		if test_st.nodes[index].Meta.peer_replica_clients[i] == nil {
+			test_st.nodes[index].Meta.peer_replica_clients[i] = test_st.backup[index].vertices[i]
 		}
 
 		//incoming connections
 		//get saved ones from backup
-		if test_st.nodes[i].meta.peer_replica_clients[index] == nil {
-			test_st.nodes[i].meta.peer_replica_clients[index] = test_st.backup[i].vertices[index]
+		if test_st.nodes[i].Meta.peer_replica_clients[index] == nil {
+			test_st.nodes[i].Meta.peer_replica_clients[index] = test_st.backup[i].vertices[index]
 		}
 	}
 }
