@@ -17,10 +17,6 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 	// 150 - 300 ms random timeout was mentioned in the paper
 	duration := time.Duration(150+rand.Intn(150)) * time.Millisecond
 
-	/*
-	 * Make sure that election is not run when context is cancelled by prioritizing
-	 * it in the `select` statement.
-	 */
 	select {
 
 	case <-time.After(duration): // for timeout to call election
@@ -80,7 +76,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 	}
 }
 
-// StartElection is called when candidate is ready to start an election
+// StartElection is called when a node transitions to a candidate
 func (node *RaftNode) StartElection(ctx context.Context) {
 
 	var received_votes int32 = 1
@@ -119,20 +115,19 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 			response, err := client_obj.RequestVote(ctx, &args)
 
 			node.raft_node_mutex.Lock()
+			defer node.raft_node_mutex.Unlock()
 
 			if err == nil {
 
 				// by the time the RPC call returns an answer, this replica might have already transitioned to another state.
 
 				if node.state != Candidate {
-					node.raft_node_mutex.Unlock()
 					return
 				}
 
 				if response.Term > node.currentTerm { // the response node has higher term than current one
 
 					node.ToFollower(ctx, response.Term)
-					node.raft_node_mutex.Unlock()
 					return
 
 				} else if response.Term == node.currentTerm {
@@ -144,7 +139,6 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 
 						if votes*2 > int(node.Meta.n_replicas) { // won the Election
 							node.ToLeader(ctx)
-
 							return
 						}
 
@@ -152,13 +146,7 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 
 				}
 
-			} else {
-
-				// log.Printf("\nError in requesting vote from replica %v: %v", replica_id, err.Error())
-
 			}
-
-			node.raft_node_mutex.Unlock()
 
 		}(ctx, node, client_obj, replica_id)
 

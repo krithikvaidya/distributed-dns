@@ -15,6 +15,7 @@ import (
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 )
 
 // Start the local key-value store and the HTTP server it listens for requests on.
@@ -71,21 +72,7 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 
 }
 
-/*
- * External function to shut down the kv store server.
- */
-func (node *RaftNode) StopKVStore() {
-
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-
-	if err := node.Meta.kv_store_server.Shutdown(ctx); err != nil {
-		log.Printf("HTTP server Shutdown error: %v\n", err)
-		node.Meta.kv_store_server.Close()
-	}
-
-}
-
-// Start HTTP server to listen for client requests
+// HTTP server to listen for client requests
 func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 
 	node.Meta.nodeAddress = addr // store address of the node
@@ -134,24 +121,9 @@ func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 }
 
 /*
- * External function to gracefully shut down the raft server
- */
-func (node *RaftNode) StopRaftServer() {
-
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-
-	// Stop the raft store service
-	if err := node.Meta.raft_server.Shutdown(ctx); err != nil {
-		log.Printf("HTTP server Shutdown error: %v\n", err)
-		node.Meta.kv_store_server.Close()
-	}
-
-}
-
-/*
- * This function starts the gRPC server for the raft node and shuts it down when
- * context is cancelled.
- */
+This function starts the gRPC server for the raft node and shuts it down when
+context is cancelled.
+*/
 func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, listener *net.TCPListener) {
 
 	// Shut down the gRPC server if the context is cancelled
@@ -161,22 +133,22 @@ func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, 
 		<-ctx.Done()
 
 		// Stop the server
-		node.Meta.grpc_server.Stop()
+		node.Meta.grpc_server.GracefulStop()
 
 		node.Meta.shutdown_chan <- "gRPC server shutdown successful."
 	}()
 
 	// Start the server
 	log.Printf("\nStarting gRPC server at address %v...\n", grpc_address)
-	err := node.Meta.grpc_server.Serve(listener)
+	err := node.Meta.grpc_server.Serve(listener) // Serve will return a non-nil error unless Stop or GracefulStop is called.
 
 	CheckErrorFatal(err)
 }
 
 /*
- * This function initializes the node and imports the persistent
- * state information to the node.
- */
+This function initializes the node and imports the persistent
+state information to the node.
+*/
 func Setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) *RaftNode {
 
 	// Key value store address of the current node
@@ -216,15 +188,13 @@ func Setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 }
 
 /*
- * This function connects an existing node to a raft system.
- *
- * It connects the current node to the other nodes. This mechanism includes the
- * initiation of their various services, like the
- * KV store server, the gRPC server and the Raft server.
- *
- * The `connect_chan` channel is used to signify the end of execution of this
- * function for synchronization and error handling.
- */
+It connects the current node to the other nodes. This mechanism includes the
+initiation of their various services, like the
+KV store server, the gRPC server and the Raft server.
+
+The `connect_chan` channel is used to signify the end of execution of this
+function for synchronization and error handling.
+*/
 func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs []string, testing bool) {
 
 	/*
@@ -255,7 +225,25 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 	// Running the gRPC server
 	go node.StartGRPCServer(ctx, grpc_address, listener)
 
-	// TODO: wait till grpc server up
+	// wait till grpc server is up
+	connxn, err := grpc.Dial(grpc_address, grpc.WithInsecure())
+
+	// below block may not be needed
+	for err != nil {
+		connxn, err = grpc.Dial(grpc_address, grpc.WithInsecure())
+	}
+
+	if !testing {
+		for {
+
+			if connxn.GetState() == connectivity.Ready {
+				break
+			}
+
+			time.Sleep(20 * time.Millisecond)
+
+		}
+	}
 
 	// Now we can start listening to client requests
 

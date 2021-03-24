@@ -121,8 +121,10 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 }
 
-// ReadCommand is called when the client sends the replica a read request.
-// ReadCommand is different since read operations do not need to be added to log
+/*
+ReadCommand is called when the client sends the replica a read request.
+Read operations do not need to be added to the log.
+*/
 func (node *RaftNode) ReadCommand(key string) (string, error) {
 	for node.commitIndex != node.lastApplied {
 		node.raft_node_mutex.RUnlock()
@@ -139,8 +141,6 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 	if (status == true) && (node.state == Leader) {
 
-		// assuming that if an operation on the state machine succeeds on one of the replicas,
-		// it will succeed on all. and vice versa.
 		url := fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, key)
 
 		resp, err := http.Get(url)
@@ -171,7 +171,7 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 
 }
 
-// StaleReadCheck sends dummy heartbeats to make sure that a new leader has not come
+// StaleReadCheck sends dummy heartbeats to make sure that a new leader has not been elected.
 func (node *RaftNode) StaleReadCheck(heartbeat_success chan bool) {
 
 	hbeat_msg := &protos.AppendEntriesMessage{
