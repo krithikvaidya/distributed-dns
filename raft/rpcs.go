@@ -56,7 +56,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	node.raft_node_mutex.Lock()
 
-	// term received is lesser than current term. CHECK: we don't reset election timer here.
+	// term received is lesser than current term.
 	if node.currentTerm > in.Term {
 		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil

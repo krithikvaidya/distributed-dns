@@ -12,7 +12,12 @@ import (
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
-//WriteCommand is called when the client sends the replica a write request.
+/*
+WriteCommand is called by the HTTP handler functions when the client sends the replica
+a write (POST/PUT/DELETE) request. It parses the command and calls LeaderSendAEs for
+performing the write. If the write request is successfully persisted across a majority
+of replicas, it informs ApplyToStateMachine to perform the write operation on the key-value store.
+*/
 func (node *RaftNode) WriteCommand(operation []string, client string) (bool, error) {
 
 	for node.commitIndex != node.lastApplied {
@@ -23,6 +28,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	}
 
+	// TODO: make the below upgrade of the mutex lock atomic.
 	node.raft_node_mutex.RUnlock()
 	node.raft_node_mutex.Lock()
 
@@ -69,6 +75,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 			return false, errors.New(prnt_str)
 		}
 
+		node.raft_node_mutex.RUnlock()
 		node.raft_node_mutex.Lock()
 	}
 
@@ -114,6 +121,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 }
 
+// ReadCommand is called when the client sends the replica a read request.
 // ReadCommand is different since read operations do not need to be added to log
 func (node *RaftNode) ReadCommand(key string) (string, error) {
 	for node.commitIndex != node.lastApplied {
@@ -128,7 +136,6 @@ func (node *RaftNode) ReadCommand(key string) (string, error) {
 	status := <-heartbeat_success
 
 	node.raft_node_mutex.RLock()
-	defer node.raft_node_mutex.RUnlock()
 
 	if (status == true) && (node.state == Leader) {
 

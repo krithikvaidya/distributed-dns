@@ -97,6 +97,11 @@ func end_test(test_st *testing_st) {
 		os.Remove(fname_kv_store)
 		os.Remove(fname_raft_persistent)
 	}
+
+	// padding time so that the OS recognises that the sockets have been
+	// unbound from the ports.
+	time.Sleep(5 * time.Second)
+
 }
 
 /*

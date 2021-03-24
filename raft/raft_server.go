@@ -71,11 +71,11 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: Make sure all committed entries are applied before responding to it.
 
 	node.raft_node_mutex.RLock()
+	defer node.raft_node_mutex.RUnlock()
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n") //sends leader address if its not the leader
-		node.raft_node_mutex.RUnlock()
 		return
 	}
 
@@ -92,6 +92,7 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "\nRead failed with error %v\n", err)
 
 	}
+
 }
 
 //handles all put requests
