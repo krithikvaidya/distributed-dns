@@ -171,17 +171,15 @@ func Setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 	 */
 	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
 
-	if !testing {
-		for {
+	for {
 
-			_, err := http.Get(test_addr)
+		_, err := http.Get(test_addr)
 
-			if err == nil {
-				log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
-				break
-			}
-
+		if err == nil {
+			log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
+			break
 		}
+
 	}
 
 	return node
@@ -233,16 +231,14 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 		connxn, err = grpc.Dial(grpc_address, grpc.WithInsecure())
 	}
 
-	if !testing {
-		for {
+	for {
 
-			if connxn.GetState() == connectivity.Ready {
-				break
-			}
-
-			time.Sleep(20 * time.Millisecond)
-
+		if connxn.GetState() == connectivity.Ready {
+			break
 		}
+
+		time.Sleep(20 * time.Millisecond)
+
 	}
 
 	// Now we can start listening to client requests
@@ -255,17 +251,15 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 	test_addr := fmt.Sprintf("http://localhost%s/test", server_address)
 
 	// Check whether the server is active
-	if !testing {
-		for {
+	for {
 
-			_, err = http.Get(test_addr)
+		_, err = http.Get(test_addr)
 
-			if err == nil {
-				log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
-				break
-			}
-
+		if err == nil {
+			log.Printf("\nRaft replica server up and listening at port %s\n", server_address)
+			break
 		}
+
 	}
 
 }

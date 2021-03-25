@@ -41,7 +41,7 @@ type NodeMetadata struct {
 }
 
 // Main struct storing different aspects of the replica and it's state
-// Refer to figure 2 in the paper
+// Refer to figure 2 of the raft paper
 type RaftNode struct {
 	protos.UnimplementedConsensusServiceServer
 
@@ -73,6 +73,7 @@ type RaftNode struct {
 	storage       *Storage   // Used for Persistence
 }
 
+// Initialize the RaftNode (and NodeMetadata) objects. Also restores persisted raft state, if any.
 func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 	// Initializes RaftNode and NodeMetadata
@@ -81,9 +82,8 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 		trackMessage: make(map[string][]string),
 
-		currentTerm: 0, // unpersisted
+		currentTerm: 0,
 		votedFor:    -1,
-		// log:         make([]LogEntry, 0), // initialized with fixed capacity of 10000, change later.
 
 		stopElectiontimer:  make(chan bool),
 		electionResetEvent: make(chan bool),
@@ -125,6 +125,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 }
 
+// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs
 func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []string) {
 
 	// Attempt to connect to the gRPC servers of all other replicas, and obtain the client stubs.
@@ -156,7 +157,8 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 	node.raft_node_mutex.Lock()
 	defer node.raft_node_mutex.Unlock()
 
-	// suppose node dies before some commits have been applied, then we want to finish applying them.
+	// suppose node dies before some commits have been applied to the state machine, then
+	// we want to finish applying them.
 	if node.commitIndex > node.lastApplied {
 		node.commits_ready <- (node.commitIndex - node.lastApplied)
 	}
@@ -165,15 +167,9 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 
 		go node.RunElectionTimer(ctx) // RunElectionTimer defined in election.go
 
-	} else if node.state == Candidate {
+	} else {
 
-		// If candidate, let it restart election. The timer for waiting
-		// for votes from other replicas will be called in StartElection
-		node.StartElection(ctx)
-
-	} else if node.state == Leader {
-
-		// if node was a leader before we want to give up leadership.
+		// If node was a leader or candidate earlier, it will give up leadership/candidacy.
 		// the new leader will soon send an heartbeat/appendentries, which will
 		// automatically convert it back to follower and call the election timer.
 
@@ -202,6 +198,8 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 			// Get the entries that are uncommited and need to be applied.
 			entries = node.log[node.lastApplied+1 : node.lastApplied+to_commit+1]
+			applied := int32(0)
+			halt_applying := false
 
 			for _, entry := range entries {
 
@@ -219,8 +217,11 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 					resp, err := http.PostForm(url, formData)
 
 					if err != nil {
-						log.Printf("\nError in client.Do(req): %v\n", err)
-						continue
+
+						log.Printf("\nError in http.PostForm in POST ApplyToStateMachine: %v\n", err)
+
+						halt_applying = true
+						break
 					}
 
 					resp.Body.Close()
@@ -233,15 +234,21 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 					req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, entry.Operation[1]), bytes.NewBufferString(formData.Encode()))
 					if err != nil {
-						log.Printf("\nError in http.NewRequest: %v\n", err)
-						continue
+						log.Printf("\nError in http.NewRequest in PUT ApplyToStateMachine: %v\n", err)
+
+						halt_applying = true
+						break
+
 					}
 					req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
 					resp, err := client.Do(req)
 					if err != nil {
-						log.Printf("\nError in client.Do: %v\n", err)
-						continue
+						log.Printf("\nError in client.Do in PUT ApplyToStateMachine: %v\n", err)
+
+						halt_applying = true
+						break
+
 					}
 
 					resp.Body.Close()
@@ -250,15 +257,21 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost%s/%s", node.Meta.kvstore_addr, entry.Operation[1]), nil)
 					if err != nil {
-						log.Printf("\nError in http.NewRequest: %v\n", err)
-						continue
+						log.Printf("\nError in http.NewRequest in DELETE ApplyToStateMachine: %v\n", err)
+
+						halt_applying = true
+						break
+
 					}
 					req.Header.Set("Content-Type", "application/x-www-form-urlencoded;")
 
 					resp, err := client.Do(req)
 					if err != nil {
-						log.Printf("\nError in client.Do: %v\n", err)
-						continue
+
+						log.Printf("\nError in client.Do in DELETE ApplyToStateMachine: %v\n", err)
+						halt_applying = true
+						break
+
 					}
 
 					resp.Body.Close()
@@ -271,9 +284,14 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 				}
 
+				if halt_applying {
+					break
+				}
+
+				applied += 1
 			}
 
-			node.lastApplied = node.lastApplied + to_commit
+			node.lastApplied = node.lastApplied + applied
 			node.persistToStorage()
 
 			node.raft_node_mutex.Unlock()
