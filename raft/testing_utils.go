@@ -11,6 +11,10 @@ import (
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
+type oldConnections struct {
+	vertices []protos.ConsensusServiceClient
+}
+
 type testing_st struct {
 	mu        sync.Mutex  // The mutex for performing operations on the struct
 	t         *testing.T  // The testing object for utility funcs to display errors
@@ -19,6 +23,7 @@ type testing_st struct {
 	nodes     []*RaftNode // The RaftNode objects of the individual replicas
 	active    []bool      // The status of each node, whether it is active(true) or not(false)
 	start     time.Time   // Time at which make_testing_st() was called
+	backup    []*oldConnections
 }
 
 /*
@@ -41,6 +46,7 @@ func start_test(t *testing.T, n int) *testing_st {
 	new_test_st.nodes = make([]*RaftNode, n)
 	new_test_st.active = make([]bool, n)
 	new_test_st.rep_addrs = make([]string, n)
+	new_test_st.backup = make([]*oldConnections, n)
 
 	// Create the replicas
 	for i := 0; i < n; i++ {
@@ -66,6 +72,13 @@ func start_test(t *testing.T, n int) *testing_st {
 
 		// Set the current node as active
 		new_test_st.active[i] = true
+	}
+
+	// store backups of all connections
+	for i := 0; i < n; i++ {
+		new_test_st.backup[i] = &oldConnections{
+			vertices: make([]protos.ConsensusServiceClient, n),
+		}
 	}
 
 	return new_test_st
@@ -243,4 +256,55 @@ func (test_st *testing_st) check_consensus(index int) int {
 	}
 
 	return count
+}
+
+/* This function can be repeatedly called to disconnect nodes
+also it will store the old connections in backup in case you
+want the node to rejoin again */
+
+func (test_st *testing_st) disconnect(index int) {
+
+	for i := int32(0); i < test_st.nodes[index].Meta.n_replicas; i++ {
+
+		if i == test_st.nodes[index].Meta.replica_id {
+			continue
+		}
+
+		//outgoing connections
+		//store in backup before deleting only if connection is not nil
+		//otherwise backup will lose original connection
+		if test_st.nodes[index].Meta.peer_replica_clients[i] != nil {
+			test_st.backup[index].vertices[i] = test_st.nodes[index].Meta.peer_replica_clients[i]
+			test_st.nodes[index].Meta.peer_replica_clients[i] = nil
+		}
+
+		//incoming connections
+		//store in backup before deleting only if connection is not nil
+		//otherwise backup will lose original connection
+		if test_st.nodes[i].Meta.peer_replica_clients[index] != nil {
+			test_st.backup[i].vertices[index] = test_st.nodes[i].Meta.peer_replica_clients[index]
+			test_st.nodes[i].Meta.peer_replica_clients[index] = nil
+		}
+	}
+}
+
+func (test_st *testing_st) connect(index int) {
+	for i := int32(0); i < test_st.nodes[index].Meta.n_replicas; i++ {
+
+		if i == test_st.nodes[index].Meta.replica_id {
+			continue
+		}
+
+		//outgoing connections
+		//get saved ones from backup
+		if test_st.nodes[index].Meta.peer_replica_clients[i] == nil {
+			test_st.nodes[index].Meta.peer_replica_clients[i] = test_st.backup[index].vertices[i]
+		}
+
+		//incoming connections
+		//get saved ones from backup
+		if test_st.nodes[i].Meta.peer_replica_clients[index] == nil {
+			test_st.nodes[i].Meta.peer_replica_clients[index] = test_st.backup[i].vertices[index]
+		}
+	}
 }
