@@ -50,7 +50,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 	* TODO: implement the functionality for DELETE. DELETE requests are not allowed to
 	* have a request body.
 	 */
-	if val && operation[0] != "DELETE" {
+	if val && (operation[0] != "DELETE") && (operation[0] != "NO-OP") {
 		equal = reflect.DeepEqual(lastClientOper, operation)
 		equal = equal && client == node.Meta.latestClient
 	}
@@ -63,7 +63,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	// If it's a PUT or DELETE request, ensure that the resource exists.
 	if operation[0] == "PUT" || operation[0] == "DELETE" {
-		
+
 		node.raft_node_mutex.Unlock()
 		node.raft_node_mutex.RLock()
 		response, err := node.ReadCommand(operation[1])

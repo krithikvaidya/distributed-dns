@@ -7,7 +7,7 @@ import (
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
-// ToFollower is called when you get a term higher than your own
+// Method to transition the replica to Follower state.
 func (node *RaftNode) ToFollower(ctx context.Context, term int32) {
 
 	log.Printf("\nIn ToFollower, previous state: %v\n", node.state)
@@ -47,7 +47,7 @@ func (node *RaftNode) ToCandidate(ctx context.Context) {
 // ToLeader is called when the candidate gets majority votes in election
 func (node *RaftNode) ToLeader(ctx context.Context) {
 
-	log.Printf("\nTransitioned to leader\n")
+	log.Printf("\nTransitioning to leader\n")
 
 	// Stop election timer since leader doesn't need it
 	node.stopElectiontimer <- true
@@ -70,8 +70,6 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 	}
 
 	// Send no-op for synchronization
-	// First obtain prevLogIndex and prevLogTerm
-
 	var operation []string
 	operation = append(operation, "NO-OP")
 
@@ -89,15 +87,38 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 	node.persistToStorage()
 	node.raft_node_mutex.Unlock()
 
-	success := make(chan bool)
-	node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1), success)
-	<-success
+	// If replicating NO-OP fails, keep retrying while the replica thinks it's still a leader.
+	for {
 
-	node.raft_node_mutex.Lock()
-	node.commitIndex++
-	node.persistToStorage()
-	node.raft_node_mutex.Unlock()
-	node.commits_ready <- 1
+		success := make(chan bool)
+		node.LeaderSendAEs("NO-OP", msg, int32(len(node.log)-1), success)
+
+		if <-success {
+
+			node.raft_node_mutex.Lock()
+			node.commitIndex++
+			node.persistToStorage()
+			node.raft_node_mutex.Unlock()
+			node.commits_ready <- 1
+			break
+
+		} else {
+
+			node.raft_node_mutex.RLock()
+
+			if node.state != Leader {
+				log.Printf("\nStopped attempting transition to leader\n")
+				node.raft_node_mutex.RUnlock()
+				return
+			}
+
+			node.raft_node_mutex.RUnlock()
+		}
+
+	}
 
 	go node.HeartBeats(ctx)
+	
+	log.Printf("\nTransitioned to leader\n")
+
 }

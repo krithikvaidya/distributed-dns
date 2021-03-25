@@ -60,36 +60,17 @@ func (node *RaftNode) ListenForShutdown(master_cancel context.CancelFunc) {
 
 	master_cancel()
 
-	select {
-	case str := <-node.Meta.shutdown_chan:
-		log.Printf("\n[1/4] %v", str)
-	case <-time.After(5 * time.Second):
-		log.Printf("\nTimeout expired, force shutdown invoked.\n")
-		return
-	}
+	log.Println()
+	for i := 1; i <= 4; i++ {
 
-	select {
-	case str := <-node.Meta.shutdown_chan:
-		log.Printf("[2/4] %v", str)
-	case <-time.After(5 * time.Second):
-		log.Printf("\nTimeout expired, force shutdown invoked.\n")
-		return
-	}
+		select {
+		case str := <-node.Meta.shutdown_chan:
+			log.Printf("[%v/4] %v", i, str)
+		case <-time.After(5 * time.Second):
+			log.Printf("\nTimeout expired, force shutdown invoked.\n")
+			return
+		}
 
-	select {
-	case str := <-node.Meta.shutdown_chan:
-		log.Printf("[3/4] %v", str)
-	case <-time.After(5 * time.Second):
-		log.Printf("\nTimeout expired, force shutdown invoked.\n")
-		return
-	}
-
-	select {
-	case str := <-node.Meta.shutdown_chan:
-		log.Printf("[4/4] %v\n\n", str)
-	case <-time.After(5 * time.Second):
-		log.Printf("\nTimeout expired, force shutdown invoked.\n")
-		return
 	}
 
 }

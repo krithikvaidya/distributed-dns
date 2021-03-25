@@ -2,7 +2,6 @@ package raft
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -25,7 +24,6 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 
 		// If there was a problem connecting to the gRPC server and invoking the RPC,
 		// we retry dialing to that server and performing the RPC. If this fails too, return false.
-
 		connxn, err := grpc.Dial(":500"+strconv.Itoa(int(replica_id)), grpc.WithInsecure())
 
 		// Obtain client stub
@@ -48,19 +46,17 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 	if response.Success == false {
 
 		if node.state != Leader {
-			log.Printf("\nReturning false in LeaderSendAE because: node.state != Leader\n")
 			return false
 		}
 
 		if response.Term > node.currentTerm {
 
 			node.ToFollower(parent_ctx, response.Term)
-			log.Printf("\nReturning false in LeaderSendAE because: response.Term > node.currentTerm and logs have not been replicated earlier.\n")
 			return false
 		}
 
 		// will reach here if response.Term <= node.currentTerm and response.Success == false
-		// decrement nextIndex and retry the RPC, and keep repeating until it succeeds
+		// Keep decrementing nextIndex and retrying the RPC until it succeeds
 		node.nextIndex[replica_id]--
 
 		var entries []*protos.LogEntry
@@ -109,13 +105,12 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 
 }
 
-// Leader sending AppendEntries to all other replicas.
+// Called when the replica wants to send AppendEntries to all other replicas.
 func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMessage, upper_index int32, successful_write chan bool) {
 
 	replica_id := int32(0)
 
 	successes := int32(1)
-
 	failures := int32(0)
 
 	for _, client_obj := range node.Meta.peer_replica_clients {
@@ -128,7 +123,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
 			node.raft_node_mutex.RLock()
-			//log.Printf("Lock on %d", replica_id)
+
 			prevLogIndex := node.nextIndex[replica_id] - 1
 			prevLogTerm := int32(-1)
 
@@ -156,7 +151,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 				tot_success := atomic.AddInt32(&successes, 1)
 
 				if tot_success == (node.Meta.n_replicas)/2+1 { // write quorum achieved
-					successful_write <- true // indicate to the calling function that the operation was perform successfully.
+					successful_write <- true // indicate to the calling function that the operation was performed successfully.
 				}
 
 			} else {
@@ -175,8 +170,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 }
 
-// HeartBeats is a goroutine that periodically makes leader
-// send heartbeats as long as it is the leader
+// HeartBeats is a goroutine that periodically sends heartbeats as long as the replicas thinks it's a leader
 func (node *RaftNode) HeartBeats(ctx context.Context) {
 
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -206,6 +200,8 @@ func (node *RaftNode) HeartBeats(ctx context.Context) {
 				return
 			}
 
+			node.raft_node_mutex.RUnlock()
+
 			hbeat_msg := &protos.AppendEntriesMessage{
 
 				Term:         node.currentTerm,
@@ -214,8 +210,6 @@ func (node *RaftNode) HeartBeats(ctx context.Context) {
 				LeaderAddr:   node.Meta.nodeAddress,
 				LatestClient: node.Meta.latestClient,
 			}
-
-			node.raft_node_mutex.RUnlock()
 
 			success := make(chan bool)
 			node.LeaderSendAEs("HBEAT", hbeat_msg, int32(len(node.log)-1), success)

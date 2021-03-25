@@ -60,12 +60,11 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
 
 	// if the current replica's term is greater than the term in the received message
 	if node.currentTerm > in.Term {
 
-		// Check if the logs were replicated earlier, i.e. if entry at PrevLogIndex (if it exists) 
+		// Check if the logs were replicated earlier, i.e. if entry at PrevLogIndex (if it exists)
 		// has term PrevLogTerm. If yes, check if the logs match.
 		if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 
@@ -85,13 +84,16 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 			// if entryIndex has reached the end of the entries received in the message, then all the logs received in the
 			// message have been replicated.
 			if entryIndex == len(in.Entries) {
+				node.raft_node_mutex.Unlock()
 				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 			} else {
+				node.raft_node_mutex.Unlock()
 				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 			}
 
 		} else {
 			// entry at PrevLogIndex does not have term PrevLogTerm
+			node.raft_node_mutex.Unlock()
 			return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 		}
 
@@ -179,11 +181,13 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 		}
 
 		node.persistToStorage()
+		node.raft_node_mutex.Unlock()
 
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: true}, nil
 
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
+		node.raft_node_mutex.Unlock()
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil
 
 	}

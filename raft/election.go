@@ -144,6 +144,10 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 
 					}
 
+				} else {
+					// we reach here if response.Term < node.currentTerm. This means that the current replica
+					// has already started another election or has accepted another replica as the leader, so we
+					// can ignore the RPC response in this case.
 				}
 
 			}
