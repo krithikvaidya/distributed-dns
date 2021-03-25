@@ -22,18 +22,18 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	for node.commitIndex != node.lastApplied {
 
-		node.raft_node_mutex.RUnlock() // Lock was acquired in the respective calling Handler function in raft_server.go
+		node.ReleaseRLock("WriteCommand1") // Lock was acquired in the respective calling Handler function in raft_server.go
 		time.Sleep(20 * time.Millisecond)
-		node.raft_node_mutex.RLock()
+		node.GetRLock("WriteCommand1")
 
 	}
 
 	// TODO: make the below upgrade of the mutex lock atomic.
-	node.raft_node_mutex.RUnlock()
-	node.raft_node_mutex.Lock()
+	node.ReleaseRLock("WriteCommand2")
+	node.GetLock("WriteCommand1")
 
 	if node.state != Leader {
-		defer node.raft_node_mutex.Unlock()
+		defer node.ReleaseLock("WriteCommand1")
 		return false, errors.New("\nNot a leader.\n")
 	}
 
@@ -57,24 +57,25 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	if equal {
 		Err = errors.New("Write operation failed. Already received identical write request from identical clientid.")
-		defer node.raft_node_mutex.Unlock()
+		defer node.ReleaseLock("WriteCommand2")
 		return false, Err
 	}
 
 	// If it's a PUT or DELETE request, ensure that the resource exists.
 	if operation[0] == "PUT" || operation[0] == "DELETE" {
 
-		node.raft_node_mutex.Unlock()
-		node.raft_node_mutex.RLock()
+		node.ReleaseLock("WriteCommand3")
+		node.GetRLock("WriteCommand2")
 		response, err := node.ReadCommand(operation[1])
 
 		if err == nil && response == "Invalid key value pair\n" {
 			prnt_str := fmt.Sprintf("\nUnable to perform %v request, no value exists for given key in the store.\n", operation[0])
+			node.ReleaseRLock("WriteCommand3")
 			return false, errors.New(prnt_str)
 		}
 
-		node.raft_node_mutex.RUnlock()
-		node.raft_node_mutex.Lock()
+		node.ReleaseRLock("WriteCommand4")
+		node.GetLock("WriteCommand2")
 	}
 
 	node.Meta.latestClient = client
@@ -98,17 +99,17 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	node.LeaderSendAEs(operation[0], msg, int32(len(node.log)-1), successful_write)
 
-	node.raft_node_mutex.Unlock()
+	node.ReleaseLock("WriteCommand4")
 
 	success := <-successful_write //Written to from AE when majority of nodes have replicated the write or failure occurs
 
 	if success {
 
-		node.raft_node_mutex.Lock()
+		node.GetLock("WriteCommand3")
 		node.commitIndex++
 		node.trackMessage[client] = operation
-		node.persistToStorage()
-		node.raft_node_mutex.Unlock()
+		node.PersistToStorage()
+		node.ReleaseLock("WriteCommand5")
 		node.commits_ready <- 1
 
 	} else {
@@ -125,17 +126,17 @@ Read operations do not need to be added to the log.
 */
 func (node *RaftNode) ReadCommand(key string) (string, error) {
 	for node.commitIndex != node.lastApplied {
-		node.raft_node_mutex.RUnlock()
+		node.ReleaseRLock("ReadCommand1")
 		time.Sleep(20 * time.Millisecond)
-		node.raft_node_mutex.RLock()
+		node.GetRLock("ReadCommand1")
 	}
 
 	heartbeat_success := make(chan bool)
 	node.StaleReadCheck(heartbeat_success)
-	node.raft_node_mutex.RUnlock()
+	node.ReleaseRLock("ReadCommand2")
 	status := <-heartbeat_success
 
-	node.raft_node_mutex.RLock()
+	node.GetRLock("ReadCommand2")
 
 	if (status == true) && (node.state == Leader) {
 

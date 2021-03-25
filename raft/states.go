@@ -16,7 +16,7 @@ func (node *RaftNode) ToFollower(ctx context.Context, term int32) {
 	node.currentTerm = term
 	node.votedFor = -1
 
-	node.persistToStorage()
+	node.PersistToStorage()
 
 	// If node was a leader, start election timer. Else if it was a follower or
 	// candidate, reset the election timer.
@@ -29,7 +29,7 @@ func (node *RaftNode) ToFollower(ctx context.Context, term int32) {
 		}()
 	}
 
-	log.Printf("\nFinished ToFollower\n")
+	log.Printf("\nReplica %v finished ToFollower\n", node.Meta.replica_id)
 }
 
 // ToCandidate is called when election timer runs out
@@ -39,7 +39,7 @@ func (node *RaftNode) ToCandidate(ctx context.Context) {
 	node.state = Candidate
 	node.currentTerm++
 	node.votedFor = node.Meta.replica_id
-	node.persistToStorage()
+	node.PersistToStorage()
 	// We can start an election for the candidate to become the leader
 	node.StartElection(ctx)
 }
@@ -84,8 +84,8 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 		LatestClient: node.Meta.latestClient,
 	}
 
-	node.persistToStorage()
-	node.raft_node_mutex.Unlock()
+	node.PersistToStorage()
+	node.ReleaseLock("ToLeader1")
 
 	// If replicating NO-OP fails, keep retrying while the replica thinks it's still a leader.
 	for {
@@ -95,30 +95,30 @@ func (node *RaftNode) ToLeader(ctx context.Context) {
 
 		if <-success {
 
-			node.raft_node_mutex.Lock()
+			node.GetLock("ToLeader")
 			node.commitIndex++
-			node.persistToStorage()
-			node.raft_node_mutex.Unlock()
+			node.PersistToStorage()
+			node.ReleaseLock("ToLeader2")
 			node.commits_ready <- 1
 			break
 
 		} else {
 
-			node.raft_node_mutex.RLock()
+			node.GetRLock("ToLeader")
 
 			if node.state != Leader {
 				log.Printf("\nStopped attempting transition to leader\n")
-				node.raft_node_mutex.RUnlock()
+				node.ReleaseRLock("ToLeader1")
 				return
 			}
 
-			node.raft_node_mutex.RUnlock()
+			node.ReleaseRLock("ToLeader2")
 		}
 
 	}
 
 	go node.HeartBeats(ctx)
-	
+
 	log.Printf("\nTransitioned to leader\n")
 
 }

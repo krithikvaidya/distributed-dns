@@ -40,22 +40,23 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 		}
 	}
 
-	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
+	node.GetLock("LeaderSendAE")
 
 	if response.Success == false {
 
 		if node.state != Leader {
+			node.ReleaseLock("LeaderSendAE")
 			return false
 		}
 
 		if response.Term > node.currentTerm {
 
 			node.ToFollower(parent_ctx, response.Term)
+			node.ReleaseLock("LeaderSendAE")
 			return false
 		}
 
-		// will reach here if response.Term <= node.currentTerm and response.Success == false
+		// will reach here if response.Term == node.currentTerm and response.Success == false
 		// Keep decrementing nextIndex and retrying the RPC until it succeeds
 		node.nextIndex[replica_id]--
 
@@ -84,6 +85,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 			LatestClient: node.Meta.latestClient,
 		}
 
+		node.ReleaseLock("LeaderSendAE")
 		return node.LeaderSendAE(parent_ctx, replica_id, upper_index, client_obj, new_msg)
 
 	} else { //response.Success == true
@@ -99,6 +101,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 
 		}
 
+		node.ReleaseLock("LeaderSendAE")
 		return true
 
 	}
@@ -127,7 +130,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 
 		go func(node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32, upper_index int32, successful_write chan bool) {
 
-			node.raft_node_mutex.RLock()
+			node.GetRLock("LeaderSendAEs1")
 
 			prevLogIndex := node.nextIndex[replica_id] - 1
 			prevLogTerm := int32(-1)
@@ -145,7 +148,7 @@ func (node *RaftNode) LeaderSendAEs(msg_type string, msg *protos.AppendEntriesMe
 				entries = append(entries, &node.log[i])
 			}
 
-			node.raft_node_mutex.RUnlock()
+			node.ReleaseRLock("LeaderSendAEs")
 
 			msg.Entries = entries
 
@@ -197,15 +200,15 @@ func (node *RaftNode) HeartBeats(ctx context.Context) {
 			default:
 			}
 
-			node.raft_node_mutex.RLock()
+			node.GetRLock("HeartBeats")
 
 			if node.state != Leader {
 
-				node.raft_node_mutex.RUnlock()
+				node.ReleaseRLock("HeartBeats1")
 				return
 			}
 
-			node.raft_node_mutex.RUnlock()
+			node.ReleaseRLock("HeartBeats2")
 
 			hbeat_msg := &protos.AppendEntriesMessage{
 

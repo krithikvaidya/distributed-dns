@@ -47,6 +47,8 @@ func (kv *store) PostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nPOST request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusCreated)
 
 	if err := r.ParseForm(); err != nil {
@@ -80,6 +82,8 @@ func (kv *store) GetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nGET request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusOK)
 
 	kv.mu.RLock()
@@ -103,6 +107,8 @@ func (kv *store) PutHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nPUT request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusAccepted)
 
 	if err := r.ParseForm(); err != nil {
@@ -135,6 +141,8 @@ func (kv *store) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nDELETE request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusOK)
 
 	kv.mu.Lock()

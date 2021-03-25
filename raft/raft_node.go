@@ -111,7 +111,7 @@ func InitializeNode(n_replica int32, rid int, keyvalue_addr string) *RaftNode {
 
 	if raft_node.storage.HasData(raft_node.Meta.raft_persistence_file) {
 
-		raft_node.restoreFromStorage(raft_node.storage)
+		raft_node.RestoreFromStorage(raft_node.storage)
 		log.Printf("\nRestored Persisted Data:\n")
 		log.Printf("\nRestored currentTerm: %v\nRestored votedFor: %v\nRestored log: %v\nRestored log length: %v\n", raft_node.currentTerm, raft_node.votedFor, raft_node.log, len(raft_node.log))
 
@@ -154,8 +154,8 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 	node.Meta.peer_replica_clients = client_objs
 
 	// Check what the persisted state was (if any), and accordingly proceed
-	node.raft_node_mutex.Lock()
-	defer node.raft_node_mutex.Unlock()
+	node.GetLock("ConnectToPeerReplicas")
+	defer node.ReleaseLock("ConnectToPeerReplicas")
 
 	// suppose node dies before some commits have been applied to the state machine, then
 	// we want to finish applying them.
@@ -192,7 +192,7 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 
 			log.Printf("\nApplyToStateMachine received commit(s)\n")
 
-			node.raft_node_mutex.Lock()
+			node.GetLock("ApplyToStateMachine")
 
 			var entries []protos.LogEntry
 
@@ -292,9 +292,9 @@ func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
 			}
 
 			node.lastApplied = node.lastApplied + applied
-			node.persistToStorage()
+			node.PersistToStorage()
 
-			node.raft_node_mutex.Unlock()
+			node.ReleaseLock("ApplyToStateMachine")
 
 		}
 

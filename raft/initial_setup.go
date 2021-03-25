@@ -40,6 +40,8 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		Addr:    addr,
 	}
 
+	srv.SetKeepAlivesEnabled(false)
+
 	node.Meta.kv_store_server = srv
 
 	// Gracefully shut down the server if context is cancelled
@@ -90,6 +92,8 @@ func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 		Handler: r,
 		Addr:    addr,
 	}
+
+	raft_server.SetKeepAlivesEnabled(false)
 
 	node.Meta.raft_server = raft_server
 

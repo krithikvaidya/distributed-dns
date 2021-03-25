@@ -15,6 +15,7 @@ type Storage struct {
 	m  map[string]interface{}
 }
 
+// Initialise Storage object
 func NewStorage() *Storage {
 
 	gob.Register([]protos.LogEntry{})
@@ -25,6 +26,7 @@ func NewStorage() *Storage {
 	}
 }
 
+// Encode as gob and write to file for persistence.
 func (stored *Storage) WriteFile(filename string) {
 	dataFile, err := os.Create(filename)
 
@@ -45,6 +47,7 @@ func (stored *Storage) WriteFile(filename string) {
 	dataFile.Close()
 }
 
+// Read the file and decode the gob.
 func (stored *Storage) ReadFile(filename string) {
 	dataFile, err := os.Open(filename)
 
@@ -65,6 +68,7 @@ func (stored *Storage) ReadFile(filename string) {
 	dataFile.Close()
 }
 
+// Get a particular value from the persisted data.
 func (stored *Storage) Get(key string, filename string) (interface{}, bool) {
 
 	stored.mu.RLock()
@@ -74,12 +78,14 @@ func (stored *Storage) Get(key string, filename string) (interface{}, bool) {
 	return value, check
 }
 
+// Write a particular value to be persisted.
 func (stored *Storage) Set(key string, value interface{}) {
 	stored.mu.Lock()
 	defer stored.mu.Unlock()
 	stored.m[key] = value
 }
 
+// Check if file where data is persisted has data or not.
 func (stored *Storage) HasData(filename string) bool {
 
 	stored.mu.RLock()
@@ -97,7 +103,7 @@ func (stored *Storage) HasData(filename string) bool {
 }
 
 // Restore persisted Raft state from non volatile memory.
-func (node *RaftNode) restoreFromStorage(storage *Storage) {
+func (node *RaftNode) RestoreFromStorage(storage *Storage) {
 
 	var check bool
 
@@ -134,7 +140,7 @@ func (node *RaftNode) restoreFromStorage(storage *Storage) {
 	node.lastApplied = t5.(int32)
 }
 
-func (node *RaftNode) persistToStorage() {
+func (node *RaftNode) PersistToStorage() {
 
 	node.storage.Set("currentTerm", node.currentTerm)
 	node.storage.Set("votedFor", node.votedFor)

@@ -21,6 +21,8 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nPOST request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusCreated)
 
 	if err := r.ParseForm(); err != nil {
@@ -28,14 +30,14 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.RLock()
+	node.GetRLock("Raft Server Post Handler")
 
 	if node.state != Leader {
 
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n")
-		node.raft_node_mutex.RUnlock()
+		node.ReleaseRLock("Raft Server Post Handler")
 		return
 	}
 
@@ -65,12 +67,14 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nGET request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusOK)
 
 	// TODO: Make sure all committed entries are applied before responding to it.
 
-	node.raft_node_mutex.RLock()
-	defer node.raft_node_mutex.RUnlock()
+	node.GetRLock("Raft Server GET Handler")
+	defer node.ReleaseRLock("Raft Server GET Handler")
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
@@ -100,6 +104,8 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\nPUT request received\n")
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusAccepted)
 
 	if err := r.ParseForm(); err != nil {
@@ -107,12 +113,12 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.raft_node_mutex.RLock()
+	node.GetRLock("Raft Server PUT Handler")
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n")
-		node.raft_node_mutex.RUnlock()
+		node.ReleaseRLock("Raft Server PUT Handler")
 		return
 	}
 
@@ -148,14 +154,16 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Connection", "close")
+
 	w.WriteHeader(http.StatusOK)
 
-	node.raft_node_mutex.RLock()
+	node.GetRLock("Raft Server Delete Handler")
 
 	if node.state != Leader {
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n") //sends leader address if its not the leader
-		node.raft_node_mutex.RUnlock()
+		node.ReleaseRLock("Raft Server Delete Handler")
 		return
 	}
 

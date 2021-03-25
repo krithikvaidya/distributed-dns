@@ -2,12 +2,17 @@ package raft
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+func init() {
+	log.SetFlags(0) // Turn off timestamps in log output.
+}
 
 /*
  * This test case checks whether the initial election works as intended

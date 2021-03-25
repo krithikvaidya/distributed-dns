@@ -1,0 +1,727 @@
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3001
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3002
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3003
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3004
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5003...
+
+Starting gRPC server at address :5001...
+
+Starting gRPC server at address :5002...
+
+Starting gRPC server at address :5004...
+
+Starting gRPC server at address :5000...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4000
+
+Raft replica server up and listening at port :4001
+
+Raft replica server up and listening at port :4003
+
+Raft replica server up and listening at port :4002
+
+Raft replica server up and listening at port :4004
+
+Election timer runs out.
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Replica 3 finished ToFollower
+
+Granting vote to 0
+
+Replica 4 finished ToFollower
+
+Granting vote to 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Replica 2 finished ToFollower
+
+Granting vote to 0
+
+Replica 0 received vote from 3
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Replica 0 received vote from 4
+
+Replica 0 transitioning to leader
+
+Transitioning to leader
+
+Replica 1 finished ToFollower
+
+Granting vote to 0
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3001
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3002
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3003
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3004
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5004...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5002...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5003...
+
+Starting gRPC server at address :5001...
+
+Starting gRPC server at address :5000...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4001
+
+Raft replica server up and listening at port :4003
+
+Raft replica server up and listening at port :4002
+
+Raft replica server up and listening at port :4004
+Starting raft replica server...
+
+Raft replica server up and listening at port :4000
+
+Election timer runs out.
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Replica 4 finished ToFollower
+
+Granting vote to 1
+
+Replica 2 finished ToFollower
+
+Granting vote to 1
+
+Replica 3 finished ToFollower
+
+Granting vote to 1
+
+Replica 1 received vote from 4
+
+Replica 1 received vote from 2
+
+Replica 1 transitioning to leader
+
+Transitioning to leader
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+In ToFollower, previous state: 0
+
+Replica 0 finished ToFollower
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+Add new entry to logs
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+Election timer runs out.
+
+Received term: 2, My term: 1, My votedFor: 1
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+In ToFollower, previous state: 0
+
+Received term: 2, My term: 1, My votedFor: -1
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+In ToFollower, previous state: 0
+
+Received term: 2, My term: 1, My votedFor: 1
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+In ToFollower, previous state: 0
+
+Replica 4 finished ToFollower
+
+Granting vote to 2
+
+Replica 0 finished ToFollower
+
+Granting vote to 2
+
+Replica 3 finished ToFollower
+
+Granting vote to 2
+
+Replica 2 received vote from 4
+
+Replica 2 received vote from 0
+
+Replica 2 transitioning to leader
+
+Transitioning to leader
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+Add new entry to logs
+
+Add new entry to logs
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3001
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3002
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3003
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3004
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5001...
+
+Starting gRPC server at address :5004...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5002...
+
+Starting gRPC server at address :5003...
+
+Starting gRPC server at address :5000...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4004
+
+Raft replica server up and listening at port :4001
+
+Raft replica server up and listening at port :4002
+
+Raft replica server up and listening at port :4003
+Starting raft replica server...
+
+Raft replica server up and listening at port :4000
+
+Election timer runs out.
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+Replica 1 finished ToFollower
+
+Granting vote to 0
+
+Replica 3 finished ToFollower
+
+Granting vote to 0
+
+In ToFollower, previous state: 0
+
+Replica 2 finished ToFollower
+
+Granting vote to 0
+
+Replica 0 received vote from 3
+
+In ToFollower, previous state: 0
+
+Replica 0 received vote from 1
+
+Replica 0 transitioning to leader
+
+Transitioning to leader
+
+Replica 4 finished ToFollower
+
+Granting vote to 0
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+Election timer runs out.
+
+Received term: 2, My term: 1, My votedFor: 0
+
+Received term: 2, My term: 1, My votedFor: 0
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+Received term: 2, My term: 1, My votedFor: 0
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+In ToFollower, previous state: 0
+
+In ToFollower, previous state: 0
+
+Replica 2 finished ToFollower
+
+Granting vote to 4
+
+Received latestLogIndex: 0, My latestLogIndex: 0, Received latestLogTerm: 1, My latestLogTerm: 1
+
+In ToFollower, previous state: 0
+
+Replica 3 finished ToFollower
+
+Granting vote to 4
+
+Replica 1 finished ToFollower
+
+Granting vote to 4
+
+Replica 4 received vote from 2
+
+Replica 4 received vote from 3
+
+Replica 4 transitioning to leader
+
+Transitioning to leader
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+Restored Persisted Data:
+
+Restored currentTerm: 1
+Restored votedFor: 0
+Restored log: [{{{} [] [] <nil>} 0 [] 1 [NO-OP]  }]
+Restored log length: 1
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5000...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4000
+
+In ToFollower, previous state: 0
+
+Replica 0 finished ToFollower
+
+Add new entry to logs
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3000
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3001
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3002
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3003
+
+No persisted data found.
+Starting local key-value store...
+
+Key-value store up and listening at port :3004
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+Obtaining client stubs of gRPC servers running at peer replicas...
+
+Starting gRPC server at address :5003...
+
+Starting gRPC server at address :5002...
+
+Starting gRPC server at address :5001...
+
+Starting gRPC server at address :5004...
+
+Starting gRPC server at address :5000...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+Starting raft replica server...
+
+Raft replica server up and listening at port :4001
+
+Raft replica server up and listening at port :4002
+
+Raft replica server up and listening at port :4004
+
+Raft replica server up and listening at port :4003
+
+Raft replica server up and listening at port :4000
+
+Election timer runs out.
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Received term: 1, My term: 0, My votedFor: -1
+
+Received latestLogIndex: -1, My latestLogIndex: -1, Received latestLogTerm: -1, My latestLogTerm: -1
+
+In ToFollower, previous state: 0
+
+Replica 3 finished ToFollower
+
+Granting vote to 4
+
+Replica 1 finished ToFollower
+
+Granting vote to 4
+
+Replica 2 finished ToFollower
+
+Granting vote to 4
+
+Replica 4 received vote from 1
+
+Replica 4 received vote from 3
+
+Replica 4 transitioning to leader
+
+Transitioning to leader
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+Transitioned to leader
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+In ToFollower, previous state: 0
+
+Replica 0 finished ToFollower
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+NO-OP encountered, continuing...
+
+ApplyToStateMachine received commit(s)
+
+NO-OP encountered, continuing...
+
+POST request received
+
+Add new entry to logs
+
+Add new entry to logs
+
+Add new entry to logs
+
+POST request completed successfully and committed.
+
+ApplyToStateMachine received commit(s)
+
+POST request received
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+ApplyToStateMachine received commit(s)
+
+POST request received
+
+POST request received
+
+POST request received
+--- FAIL: TestBasicAgreement (7.01s)
+panic: runtime error: index out of range [1] with length 0 [recovered]
+	panic: runtime error: index out of range [1] with length 0
+
+goroutine 15109 [running]:
+testing.tRunner.func1.1(0xa2e960, 0xc000c07080)
+	/usr/local/go/src/testing/testing.go:1076 +0x30d
+testing.tRunner.func1(0xc0002bf980)
+	/usr/local/go/src/testing/testing.go:1079 +0x41a
+panic(0xa2e960, 0xc000c07080)
+	/usr/local/go/src/runtime/panic.go:969 +0x175
+github.com/krithikvaidya/distributed-dns/raft.(*testing_st).check_consensus(0xc001928ea0, 0x1, 0x0)
+	/home/krithik/Git/distributed-dns/raft/testing_utils.go:227 +0x4f8
+github.com/krithikvaidya/distributed-dns/raft.TestBasicAgreement(0xc0002bf980)
+	/home/krithik/Git/distributed-dns/raft/raft_test.go:169 +0x42b
+testing.tRunner(0xc0002bf980, 0xa9c3e0)
+	/usr/local/go/src/testing/testing.go:1127 +0xef
+created by testing.(*T).Run
+	/usr/local/go/src/testing/testing.go:1178 +0x386
+exit status 2
+FAIL	github.com/krithikvaidya/distributed-dns/raft	49.051s

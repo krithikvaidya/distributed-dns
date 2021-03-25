@@ -128,7 +128,7 @@ func end_test(test_st *testing_st) {
  */
 func (test_st *testing_st) crash_raft_node(id int) {
 	// Save the current status in persistent storage
-	test_st.nodes[id].persistToStorage()
+	test_st.nodes[id].PersistToStorage()
 
 	// Mark the node as 'inactive'
 	test_st.active[id] = false
