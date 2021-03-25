@@ -88,12 +88,14 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: true}, nil
 			} else {
 				node.ReleaseLock("AppendEntries2")
+				log.Printf("\nResponding False in AE because entryIndex != len(in.Entries)")
 				return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 			}
 
 		} else {
 			// entry at PrevLogIndex does not have term PrevLogTerm
 			node.ReleaseLock("AppendEntries3")
+			log.Printf("\nResponding False in AE because entry at PrevLogIndex does not have term PrevLogTerm")
 			return &protos.AppendEntriesResponse{Term: node.currentTerm, Success: false}, nil
 		}
 
@@ -188,6 +190,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	} else { //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 
 		node.ReleaseLock("AppendEntries5")
+		log.Printf("\nResponding False in AE because log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm 2")
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: false}, nil
 
 	}

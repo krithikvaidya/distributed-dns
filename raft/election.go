@@ -156,12 +156,11 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 					// we reach here if response.Term < node.currentTerm. This means that the current replica
 					// has already started another election or has accepted another replica as the leader, so we
 					// can ignore the RPC response in this case.
-					node.ReleaseLock("StartElection3")
 				}
 
 			}
 
-			node.ReleaseLock("StartElection4")
+			node.ReleaseLock("StartElection3")
 
 		}(ctx, node, client_obj, replica_id)
 
