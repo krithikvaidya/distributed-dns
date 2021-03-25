@@ -164,7 +164,8 @@ func TestBasicAgreement(t *testing.T) {
 	resp.Body.Close()
 
 	// Allow entries to be added
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
+
 	//find how many nodes agree at index 1
 	agreeCount := test_sys.check_consensus(1)
 	// if all don't agree
