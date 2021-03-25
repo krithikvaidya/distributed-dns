@@ -1,5 +1,6 @@
 # Distributed DNS
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/krithikvaidya/distributed-dns)](https://goreportcard.com/report/github.com/krithikvaidya/distributed-dns)
 [![](https://godoc.org/github.com/krithikvaidya/distributed-dns?status.svg)](https://godoc.org/github.com/krithikvaidya/distributed-dns)
 
 A repository containing our learnings and implementations for the project "Distributed DNS in the Cloud" under IEEE-NITK (Work in Progress)
