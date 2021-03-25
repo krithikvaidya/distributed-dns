@@ -8,14 +8,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Test handler
+// Clients can make a request to the /test endpoint to check if the server is up.
 func (node *RaftNode) TestHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "\nServer is up\n\n")
 
 }
 
-//handles all post requests
+// Handle POST requests
 func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPOST request received\n")
@@ -34,7 +34,7 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Fprintf(w, "\nError: Not a leader.\n")
 
-		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n") //sends leader address if its not the leader
+		fmt.Fprintf(w, "\nLast known leader's address: "+node.Meta.leaderAddress+"\n")
 		node.raft_node_mutex.RUnlock()
 		return
 	}
@@ -43,7 +43,6 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 	client := r.FormValue("client")
 	params := mux.Vars(r)
 	key := params["key"]
-	fmt.Println(client + "\n")
 
 	operation := make([]string, 3)
 	operation[0] = "POST"
@@ -55,12 +54,12 @@ func (node *RaftNode) PostHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("\nPOST request completed successfully and committed.\n")
 		fmt.Fprintf(w, "\nPOST request completed successfully and committed.\n")
 	} else {
-		log.Printf("\n%v\n", err.Error())
-		fmt.Fprintf(w, "\n%v\n", err.Error())
+		log.Printf("\nError occured in POST request: %v\n", err.Error())
+		fmt.Fprintf(w, "\nError occured in POST request: %v\n", err.Error())
 	}
 }
 
-//handles get requests
+// Handle GET requests
 func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nGET request received\n")
@@ -89,13 +88,13 @@ func (node *RaftNode) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 
-		fmt.Fprintf(w, "\nRead failed with error %v\n", err)
+		fmt.Fprintf(w, "\nRead failed with error: %v\n", err)
 
 	}
 
 }
 
-//handles all put requests
+// Handle PUT requests
 func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nPUT request received\n")
@@ -132,13 +131,13 @@ func (node *RaftNode) PutHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("\nPUT request completed successfully and committed.\n")
 		fmt.Fprintf(w, "\nPUT request completed successfully and committed.\n")
 	} else {
-		log.Printf("\n%v\n", err.Error())
-		fmt.Fprintf(w, "\n%v\n", err.Error())
+		log.Printf("\nError occured in PUT request: %v\n", err.Error())
+		fmt.Fprintf(w, "\nError occured in PUT request: %v\n", err.Error())
 	}
 
 }
 
-//handles all delete requests
+// Handles DELETE requests
 func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("\nDELETE request received\n")
@@ -172,7 +171,7 @@ func (node *RaftNode) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("\nDELETE requested completed successfully and committed.\n")
 		fmt.Fprintf(w, "\nDELETE requested completed successfully and committed.\n")
 	} else {
-		log.Printf("\n%v\n", err.Error())
-		fmt.Fprintf(w, "\n%v\n", err.Error())
+		log.Printf("\nError occured in DELETE request: %v\n", err.Error())
+		fmt.Fprintf(w, "\nError occured in DELETE request: %v\n", err.Error())
 	}
 }

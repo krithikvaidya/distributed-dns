@@ -7,9 +7,12 @@ import (
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
 
+// Implements the functionality involved when a replica recieves a RequestVote RPC.
+// If the received message's term is greater than the replica's current term, transition to
+// follower (if not already a follower) and update term. If in.Term < node.currentTerm, reject vote.
+// If the candidate's log is not atleast as up-to-date as the replica's, reject vote.
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
-	// log.Printf("\nIn RequestVote. RWMutex write locked = %v\n", mutexasserts.RWMutexLocked(&node.raft_node_mutex))
 	node.raft_node_mutex.Lock()
 
 	latestLogIndex := int32(-1)
@@ -52,17 +55,18 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 
 }
 
+// Implements the functionality involved when a replica recieves an AppendEntries RPC, as the
+// Raft paper describes it.
 func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntriesMessage) (*protos.AppendEntriesResponse, error) {
 
 	node.raft_node_mutex.Lock()
 	defer node.raft_node_mutex.Unlock()
 
-	// term received is lesser than current term.
+	// if the current replica's term is greater than the term in the received message
 	if node.currentTerm > in.Term {
 
-		// check if the logs were replicated earlier
-		// check if entry at PrevLogIndex (if it exists) has term PrevLogTerm. If yes, chec
-		// if the logs match.
+		// Check if the logs were replicated earlier, i.e. if entry at PrevLogIndex (if it exists) 
+		// has term PrevLogTerm. If yes, check if the logs match.
 		if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 
 			entryIndex := 0
@@ -102,8 +106,8 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 	}
 
-	// here we can be sure that the node's current term and the term in the message match, and that the node is not a leader or a
-	// candidate.
+	// here we can be sure that the node's current term and the term in the message match, and that the current replica
+	// is not a leader or a candidate.
 	node.electionResetEvent <- true
 
 	node.Meta.leaderAddress = in.LeaderAddr // gets the leaders address
@@ -111,7 +115,6 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 	// we ensure that the entry at PrevLogIndex (if it exists) has term PrevLogTerm
 	if (in.PrevLogIndex == int32(-1)) || ((in.PrevLogIndex < int32(len(node.log))) && (node.log[in.PrevLogIndex].Term == in.PrevLogTerm)) {
 
-		//log.Printf("\nin.PrevLogIndex : %d, in.PrevLogTerm : %d\n", in.PrevLogIndex, in.PrevLogTerm)
 		logIndex := int(in.PrevLogIndex + 1)
 		entryIndex := 0
 
@@ -128,11 +131,9 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		// at this point, logIndex has either reached the end of the log (or the first conflicting entry), and/or entryIndex has reached the end
 		// of the message's entries. if entryIndex has reached the end, it means that there is nothing new to add to the candidate's log.
-		flag := false
 
 		for ; entryIndex < len(in.Entries); entryIndex++ {
 
-			flag = true
 			if logIndex == len(node.log) {
 
 				// add new entry to log
@@ -151,15 +152,9 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 		}
 
-		if flag {
-			node.persistToStorage()
-		}
-
 		if in.LeaderCommit > node.commitIndex {
 
 			old_commit_index := node.commitIndex
-
-			log.Printf("\nin.LeaderCommit %v node.commitIndex %v int32(len(node.log)-1) %v\n", in.LeaderCommit, node.commitIndex, int32(len(node.log)-1))
 
 			node.Meta.latestClient = in.LatestClient // stores the id of the most recent client
 
@@ -169,7 +164,7 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 
 			}
 
-			if in.LeaderCommit < int32(len(node.log)-1) {
+			if in.LeaderCommit < int32(len(node.log)) {
 
 				node.commitIndex = in.LeaderCommit
 
@@ -178,11 +173,12 @@ func (node *RaftNode) AppendEntries(ctx context.Context, in *protos.AppendEntrie
 				node.commitIndex = int32(len(node.log) - 1)
 
 			}
-			node.persistToStorage()
 
 			node.commits_ready <- (node.commitIndex - old_commit_index)
 
 		}
+
+		node.persistToStorage()
 
 		return &protos.AppendEntriesResponse{Term: in.Term, Success: true}, nil
 

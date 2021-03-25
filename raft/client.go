@@ -63,9 +63,7 @@ func (node *RaftNode) WriteCommand(operation []string, client string) (bool, err
 
 	// If it's a PUT or DELETE request, ensure that the resource exists.
 	if operation[0] == "PUT" || operation[0] == "DELETE" {
-
-		// ReadCommand() requires that only a readlock has been obtained in the
-		// caller function.
+		
 		node.raft_node_mutex.Unlock()
 		node.raft_node_mutex.RLock()
 		response, err := node.ReadCommand(operation[1])
