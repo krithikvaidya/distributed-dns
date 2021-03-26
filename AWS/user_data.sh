@@ -19,7 +19,9 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 
+export N_REPLICA=
 export REPLICA_ID= # 0, 1, 2...
+
 export REP_0_GRPC_ADDR= # internal IP of replica 0
 export REP_1_GRPC_ADDR=
 export REP_2_GRPC_ADDR=
@@ -33,6 +35,6 @@ export INST_ID_1=
 export INST_ID_2=
 
 cd /home/ubuntu/workspace/distributed-dns/replicated_kv_store
-./replicated_kv_store -n 3
+./replicated_kv_store
 
 --//

@@ -21,23 +21,7 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
-
-		// If there was a problem connecting to the gRPC server and invoking the RPC,
-		// we retry dialing to that server and performing the RPC. If this fails too, return false.
-		connxn, err := grpc.Dial(":500"+strconv.Itoa(int(replica_id)), grpc.WithInsecure())
-
-		// Obtain client stub
-		cli := protos.NewConsensusServiceClient(connxn)
-
-		node.Meta.peer_replica_clients[replica_id] = cli
-
-		// Call the AppendEntries RPC for the given client
-		ctx, _ := context.WithTimeout(parent_ctx, 40*time.Millisecond)
-		response, err = client_obj.AppendEntries(ctx, msg)
-
-		if err != nil {
-			return false
-		}
+		return false
 	}
 
 	node.GetLock("LeaderSendAE")

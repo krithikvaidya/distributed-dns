@@ -257,7 +257,7 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 	// Now we can start listening to client requests
 
 	// Set up the server that listens for client requests.
-	server_address := ":400" + strconv.Itoa(id)
+	server_address := ":4000"
 	log.Println("Starting raft replica server...")
 	go node.StartRaftServer(ctx, server_address, testing)
 

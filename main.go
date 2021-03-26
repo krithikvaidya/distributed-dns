@@ -25,12 +25,16 @@ func init() {
 	 */
 	testing.Init()
 
-	// Command line parameters
-	flag.IntVar(&n_replica, "n", 5, "total number of replicas (default=5)")
-	flag.Parse()
-
 	log.SetFlags(0) // Turn off timestamps in log output.
 	rand.Seed(time.Now().UnixNano())
+
+	f, err := os.OpenFile("node_logs", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+
+	wrt := io.MultiWriter(os.Stdout, f)
+	log.SetOutput(wrt)
 
 }
 
@@ -38,9 +42,11 @@ func main() {
 
 	log.Println("Raft-based Replicated Key Value Store")
 
-	log.Printf("Enter the replica's id: ")
-	var rid int
-	fmt.Scanf("%d", &rid)
+	n_replica := strconv.Atoi(os.Getenv("N_REPLICA"))
+
+	// Get replica id from env variable
+	rid, _ := strconv.Atoi(os.Getenv("REPLICA_ID"))
+	log.Printf("Replica ID = %v\n", rid)
 
 	master_context, master_cancel := context.WithCancel(context.Background())
 
@@ -56,7 +62,8 @@ func main() {
 			continue
 		}
 
-		rep_addrs[i] = ":500" + strconv.Itoa(i)
+		rep_i_addr := "REP_" + strconv.Itoa(i) + "_GRPC_ADDR"
+		rep_addrs[i] = os.Getenv(rep_i_addr) + ":5000"
 	}
 
 	// Perform steps necessary to setup the node as an active replica.
