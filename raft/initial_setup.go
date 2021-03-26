@@ -19,7 +19,7 @@ import (
 )
 
 // Start the local key-value store and the HTTP server it listens for requests on.
-func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
+func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int, testing bool) {
 
 	filename := "600" + strconv.Itoa(num)
 
@@ -70,12 +70,14 @@ func (node *RaftNode) StartKVStore(ctx context.Context, addr string, num int) {
 		CheckErrorFatal(err)
 	}
 
-	node.Meta.shutdown_chan <- "KV store shutdown successful."
+	if !testing {
+		node.Meta.shutdown_chan <- "KV store shutdown successful."
+	}
 
 }
 
 // HTTP server to listen for client requests
-func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
+func (node *RaftNode) StartRaftServer(ctx context.Context, addr string, testing bool) {
 
 	node.Meta.nodeAddress = addr // store address of the node
 
@@ -121,14 +123,17 @@ func (node *RaftNode) StartRaftServer(ctx context.Context, addr string) {
 		CheckErrorFatal(err)
 	}
 
-	node.Meta.shutdown_chan <- "Client request listener shutdown successful."
+	if !testing {
+		node.Meta.shutdown_chan <- "Client request listener shutdown successful."
+	}
+
 }
 
 /*
 This function starts the gRPC server for the raft node and shuts it down when
 context is cancelled.
 */
-func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, listener *net.TCPListener) {
+func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, listener *net.TCPListener, testing bool) {
 
 	// Shut down the gRPC server if the context is cancelled
 	go func() {
@@ -139,7 +144,10 @@ func (node *RaftNode) StartGRPCServer(ctx context.Context, grpc_address string, 
 		// Stop the server
 		node.Meta.grpc_server.GracefulStop()
 
-		node.Meta.shutdown_chan <- "gRPC server shutdown successful."
+		if !testing {
+			node.Meta.shutdown_chan <- "gRPC server shutdown successful."
+		}
+
 	}()
 
 	// Start the server
@@ -162,12 +170,12 @@ func Setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 	node := InitializeNode(int32(n_replicas), id, kv_addr)
 
 	// ApplyToStateMachine() is defined in raft_node.go
-	go node.ApplyToStateMachine(ctx)
+	go node.ApplyToStateMachine(ctx, testing)
 
 	// Starting KV store
 	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
-	go node.StartKVStore(ctx, kvstore_addr, id)
+	go node.StartKVStore(ctx, kvstore_addr, id, testing)
 
 	/*
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
@@ -225,7 +233,7 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 	protos.RegisterConsensusServiceServer(node.Meta.grpc_server, node)
 
 	// Running the gRPC server
-	go node.StartGRPCServer(ctx, grpc_address, listener)
+	go node.StartGRPCServer(ctx, grpc_address, listener, testing)
 
 	// wait till grpc server is up
 	connxn, err := grpc.Dial(grpc_address, grpc.WithInsecure())
@@ -250,7 +258,7 @@ func (node *RaftNode) Connect_raft_node(ctx context.Context, id int, rep_addrs [
 	// Set up the server that listens for client requests.
 	server_address := ":400" + strconv.Itoa(id)
 	log.Println("Starting raft replica server...")
-	go node.StartRaftServer(ctx, server_address)
+	go node.StartRaftServer(ctx, server_address, testing)
 
 	test_addr := fmt.Sprintf("http://localhost%s/test", server_address)
 

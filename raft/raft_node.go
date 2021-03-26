@@ -178,14 +178,16 @@ func (node *RaftNode) ConnectToPeerReplicas(ctx context.Context, rep_addrs []str
 }
 
 // Apply committed entries to our key-value store.
-func (node *RaftNode) ApplyToStateMachine(ctx context.Context) {
+func (node *RaftNode) ApplyToStateMachine(ctx context.Context, testing bool) {
 
 	for {
 
 		select {
 
 		case <-ctx.Done():
-			node.Meta.shutdown_chan <- "ApplyToStateMachine shutdown successful."
+			if !testing {
+				node.Meta.shutdown_chan <- "ApplyToStateMachine shutdown successful."
+			}
 			return
 
 		case to_commit := <-node.commits_ready:
