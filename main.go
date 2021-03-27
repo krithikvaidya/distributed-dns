@@ -62,7 +62,7 @@ func main() {
 			continue
 		}
 
-		rep_i_addr := "REP_" + strconv.Itoa(i) + "_GRPC_ADDR"
+		rep_i_addr := "REP_" + strconv.Itoa(i) + "_INTERNAL_IP"
 		rep_addrs[i] = os.Getenv(rep_i_addr) + ":5000"
 	}
 
