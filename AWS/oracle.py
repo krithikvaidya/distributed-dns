@@ -73,9 +73,19 @@ class Oracle:
 
     def register_replica(self, data):
 
-        inst_id = data['inst_id']
-        region = data['region']
-        internal_ip = data['internal_ip']
+        inst_id = data['inst_id'].strip()
+        region = data['region'].strip()
+
+        ec2_client = boto3.client('ec2', region_name=region)
+
+        response = ec2_client.describe_instances(
+            InstanceIds=[
+                inst_id,
+            ]
+        )
+
+        internal_ip = response['Reservations'][0]['Instances'][0]['PrivateIpAddress']
+        print(internal_ip)
 
         for instance in self.instance_details[region]:
             if instance['inst_id'] == inst_id:
@@ -196,11 +206,12 @@ def clear_all():
     global init_done
     global oracle
 
-    del oracle
+    if oracle is not None:
+        del oracle
     init_done = False
 
     return {"message": "Successfully cleared data"}
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0')

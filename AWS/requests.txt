@@ -1,0 +1,3 @@
+curl --header "Content-Type: application/json" --request POST --data '{"n_regions": "1", "region_names": ["us-east-1"], "instances_per_region": "9", "replicas_per_ns": "3"}' http://127.0.0.1:5000/init
+
+curl --header "Content-Type: application/json" --request POST --data '{"inst_id": "i-08869900d12c4219e", "region": "us-east-1", "internal_ip": "172.31.2.177"}' http://127.0.0.1:5000/register_replica
