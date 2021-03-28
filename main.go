@@ -42,9 +42,10 @@ func main() {
 
 	log.Println("Raft-based Replicated Key Value Store")
 
-	raft.RegisterWithOracle()
+	oracle_addr := os.Getenv("ORACLE_ADDR")
 
-	raft.GetEnvFromOracle()
+	raft.RegisterWithOracle(oracle_addr)
+	raft.GetEnvFromOracle(oracle_addr)
 
 	n_replica, _ := strconv.Atoi(os.Getenv("N_REPLICA"))
 

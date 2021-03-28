@@ -139,21 +139,21 @@ class Oracle:
 
             i += 1
 
-        replica_id =  (i % self.instances_per_region)
+        replica_id =  (i % self.replicas_per_ns)
 
         internal_ips = []
         instance_ids = []
 
-        for j in range(self.instances_per_region):
-            internal_ips.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['internal_ip'])
-            instance_ids.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['inst_id'])
+        for j in range(self.replicas_per_ns):
+            internal_ips.append(self.instance_details[data['region']][(self.replicas_per_ns * (i // self.replicas_per_ns)) + j]['internal_ip'])
+            instance_ids.append(self.instance_details[data['region']][(self.replicas_per_ns * (i // self.replicas_per_ns)) + j]['inst_id'])
 
         env_vars = {
             'message': '',
             'n_replicas': self.replicas_per_ns,
             'replica_id': replica_id,
             'internal_ips': internal_ips,
-            'tg_arn': (self.TG_ARNs[data['region']][i//self.instances_per_region]).strip(),
+            'tg_arn': (self.TG_ARNs[data['region']][i//self.replicas_per_ns]).strip(),
             'instance_ids': instance_ids
         }
         print("Returning: ")

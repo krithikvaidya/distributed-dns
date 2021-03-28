@@ -33,4 +33,4 @@ else
 
 fi
 
-runuser -l ubuntu -c 'cd /home/ubuntu/workspace/distributed-dns/ && ./distributed-dns'
+runuser -l ubuntu -c 'export ORACLE_ADDR= && cd /home/ubuntu/workspace/distributed-dns/ && ./distributed-dns'

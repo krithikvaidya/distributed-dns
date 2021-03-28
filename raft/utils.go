@@ -62,7 +62,7 @@ func init() {
 var Inst_meta EC2InstanceMetadata
 
 // Register replica with oracle responsible for assigning it to a nameserver.
-func RegisterWithOracle() {
+func RegisterWithOracle(oracle_addr string) {
 
 	cmd := exec.Command("wget", "-q", "-O", "-", "http://169.254.169.254/latest/meta-data/instance-id")
 	inst_id, err := cmd.Output()
@@ -86,7 +86,7 @@ func RegisterWithOracle() {
 
 	jsonValue, _ := json.Marshal(req_data)
 
-	resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/register_replica", "application/json", bytes.NewBuffer(jsonValue))
+	resp, err := http.Post("http://"+oracle_addr+":5000/register_replica", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		fmt.Printf("%v", err)
 	}
@@ -100,7 +100,7 @@ func RegisterWithOracle() {
 	log.Printf(bodyString)
 }
 
-func GetEnvFromOracle() {
+func GetEnvFromOracle(oracle_addr string) {
 
 	req_data := map[string]string{
 		"region":  Inst_meta.region,
@@ -111,7 +111,7 @@ func GetEnvFromOracle() {
 
 	for {
 
-		resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
+		resp, err := http.Post("http://"+oracle_addr+"http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
 			fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
 		}
