@@ -31,7 +31,7 @@ func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMes
 	// If the received message's term is greater than the replica's current term, transition to
 	// follower (if not already a follower) and update term.
 	if in.Term > node.currentTerm {
-		node.ToFollower(ctx, in.Term)
+		node.ToFollower(node.Meta.Master_ctx, in.Term)
 	}
 
 	// If ToFollower was called above, in.Term and node.currentTerm will be equal. If in.Term < node.currentTerm, reject vote.
