@@ -175,31 +175,31 @@ func CheckErrorFatal(err error) {
 
 func (node *RaftNode) GetLock(where string) {
 
-	log.Printf("\nReplica %v trying to get lock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("\nReplica %v trying to get lock in %v\n", node.Meta.replica_id, where)
 	node.raft_node_mutex.Lock()
-	log.Printf("Replica %v got lock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("Replica %v got lock in %v\n", node.Meta.replica_id, where)
 
 }
 
 func (node *RaftNode) ReleaseLock(where string) {
 
 	node.raft_node_mutex.Unlock()
-	log.Printf("\nReplica %v released lock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("\nReplica %v released lock in %v\n", node.Meta.replica_id, where)
 
 }
 
 func (node *RaftNode) GetRLock(where string) {
 
-	log.Printf("\nReplica %v trying to get RLock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("\nReplica %v trying to get RLock in %v\n", node.Meta.replica_id, where)
 	node.raft_node_mutex.RLock()
-	log.Printf("\nReplica %v got RLock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("\nReplica %v got RLock in %v\n", node.Meta.replica_id, where)
 
 }
 
 func (node *RaftNode) ReleaseRLock(where string) {
 
 	node.raft_node_mutex.RUnlock()
-	log.Printf("\nReplica %v released RLock in %v\n", node.Meta.replica_id, where)
+	// log.Printf("\nReplica %v released RLock in %v\n", node.Meta.replica_id, where)
 
 }
 

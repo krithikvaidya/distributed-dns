@@ -13,8 +13,6 @@ import (
 // If the candidate's log is not atleast as up-to-date as the replica's, reject vote.
 func (node *RaftNode) RequestVote(ctx context.Context, in *protos.RequestVoteMessage) (*protos.RequestVoteResponse, error) {
 
-	log.Printf("\nReceived RequestVote RPC\n")
-
 	node.GetLock("RequestVote")
 
 	latestLogIndex := int32(-1)
