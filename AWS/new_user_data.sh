@@ -19,8 +19,18 @@ Content-Disposition: attachment; filename="userdata.txt"
 
 #!/bin/bash
 
-runuser -l ubuntu -c 'curl -L "https://gist.githubusercontent.com/krithikvaidya/a99c6beb27a3f85e8161073216f068c8/raw" --output ec2_onetime_setup.sh'
-runuser -l ubuntu -c 'chmod +x ec2_onetime_setup.sh'
-runuser -l ubuntu -c './ec2_onetime_setup.sh'
+FILE=init_done
+if test -f "$FILE"; then
+    echo "$FILE exists. Skipping initialization"
+else
+    echo "$FILE does not exist. Performing initialization"
 
-runuser -l ubuntu -c 'cd /home/ubuntu/workspace/distributed-dns/replicated_kv_store && ./replicated_kv_store -n 3'
+    runuser -l ubuntu -c 'curl -L "https://gist.githubusercontent.com/krithikvaidya/a99c6beb27a3f85e8161073216f068c8/raw" --output ec2_onetime_setup.sh'
+    runuser -l ubuntu -c 'chmod +x ec2_onetime_setup.sh'
+    runuser -l ubuntu -c './ec2_onetime_setup.sh'
+
+    touch init_done
+
+fi
+
+runuser -l ubuntu -c 'cd /home/ubuntu/workspace/distributed-dns/ && ./replicated_kv_store'

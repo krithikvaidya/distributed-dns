@@ -1,13 +1,19 @@
 package raft
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -24,6 +30,20 @@ var Cyan = "\033[36m"
 var Gray = "\033[37m"
 var White = "\033[97m"
 
+type GetEnvResponse struct {
+	Message      string   `json:message`
+	N_replicas   int      `json:n_replicas`
+	Replica_id   int      `json:replica_id`
+	Internal_ips []string `json:internal_ips`
+	Tg_arn       string   `json:tg_arn`
+	Instance_ids []string `json:instance_ids`
+}
+
+type EC2InstanceMetadata struct {
+	inst_id string
+	region  string
+}
+
 func init() {
 
 	if runtime.GOOS == "windows" {
@@ -39,6 +59,9 @@ func init() {
 	}
 }
 
+var Inst_meta EC2InstanceMetadata
+
+// Register replica with oracle responsible for assigning it to a nameserver.
 func RegisterWithOracle() {
 
 	cmd := exec.Command("wget", "-q", "-O", "-", "http://169.254.169.254/latest/meta-data/instance-id")
@@ -50,6 +73,12 @@ func RegisterWithOracle() {
 	region = strings.Trim(string(op), "\n")
 	region2 := region[:len(region)-1]
 
+	Inst_meta = EC2InstanceMetadata{
+
+		inst_id: string(inst_id),
+		region:  region2,
+	}
+
 	req_data := map[string]string{
 		"region":  region2,
 		"inst_id": string(inst_id),
@@ -58,12 +87,62 @@ func RegisterWithOracle() {
 	jsonValue, _ := json.Marshal(req_data)
 
 	resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/register_replica", "application/json", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		fmt.Printf("%v", err)
+	}
+	defer resp.Body.Close()
+
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("%v", err)
 	}
 	bodyString := string(bodyBytes)
 	log.Printf(bodyString)
+}
+
+func GetEnvFromOracle() {
+
+	req_data := map[string]string{
+		"region":  Inst_meta.region,
+		"inst_id": Inst_meta.inst_id,
+	}
+
+	jsonValue, _ := json.Marshal(req_data)
+
+	resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+	}
+	defer resp.Body.Close()
+
+	response_map := &GetEnvResponse{}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+	}
+
+	if err = json.Unmarshal(bodyBytes, response_map); err != nil {
+		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+	}
+
+	if response_map.Message == "Waiting for more instances to register" {
+		fmt.Printf("\nWaiting for more instances to register\n")
+		return
+	}
+
+	os.Setenv("N_REPLICAS", strconv.Itoa(response_map.N_replicas))
+	os.Setenv("REPLICA_ID", strconv.Itoa(response_map.Replica_id))
+	os.Setenv("TG_ARN", response_map.Tg_arn)
+
+	for i := 0; i < response_map.N_replicas; i++ {
+
+		os.Setenv("INST_ID_"+strconv.Itoa(i), response_map.Instance_ids[i])
+		os.Setenv("REP_"+strconv.Itoa(i)+"_INTERNAL_IP", response_map.Internal_ips[i])
+
+	}
+
+	fmt.Println("Successfully obtained and set environment variables")
+
 }
 
 func CheckErrorFatal(err error) {
@@ -168,7 +247,7 @@ func (node *RaftNode) LBRegister() {
 	log.Printf("Output1: %v", out)
 
 	// Register self
-	iid := "INST_ID_" + strconv.Itoa(int(node.meta.replica_id))
+	iid := "INST_ID_" + strconv.Itoa(int(node.Meta.replica_id))
 	target := "Id=" + os.Getenv(iid)
 
 	cmd = exec.Command("aws", "elbv2", "register-targets", "--target-group-arn", tg_arn, "--targets", target)

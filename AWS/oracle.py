@@ -6,10 +6,13 @@ import boto3
 from flask import Flask
 from flask import request
 
+from threading import Lock
+
 app = Flask(__name__)
 
 init_done = False
 oracle = None
+mutex = Lock()
 
 class Oracle:
 
@@ -73,6 +76,9 @@ class Oracle:
 
     def register_replica(self, data):
 
+        global mutex
+        mutex.acquire()
+        
         inst_id = data['inst_id'].strip()
         region = data['region'].strip()
 
@@ -95,13 +101,35 @@ class Oracle:
             return {"message": "Cannot register more instances for this region."}
 
         self.instance_details[region].append({'inst_id': inst_id, 'internal_ip': internal_ip})
+
+        mutex.release()
         return {"message": "Registered " + inst_id}
 
 
     def get_env(self, data):
 
+        global mutex
+        mutex.acquire()
+
         if len(self.instance_details[data['region']]) != self.instances_per_region:
-            return {"message": "Waiting for more instances to register"}
+            mutex.release()
+            return {
+                "message": "Waiting for more instances to register"
+            }
+
+        data['region'] = data['region'].strip()
+        data['inst_id'] = data['inst_id'].strip()
+        data['internal_ip'] = data['internal_ip'].strip()
+
+        ec2_client = boto3.client('ec2', region_name=data['region'])
+
+        response = ec2_client.describe_instances(
+            InstanceIds=[
+                data['inst_id'],
+            ]
+        )
+
+        data['internal_ip'] = response['Reservations'][0]['Instances'][0]['PrivateIpAddress']
 
         i = 0
         for instance in self.instance_details[data['region']]:
@@ -119,7 +147,9 @@ class Oracle:
             internal_ips.append(self.instance_details[data['region']][(self.instances_per_region * (i / self.instances_per_region)) + j]['internal_ip'])
             instance_ids.append(self.instance_details[data['region']][(self.instances_per_region * (i / self.instances_per_region)) + j]['inst_id'])
 
+        mutex.release()
         return {
+            'message': '',
             'n_replicas': self.replicas_per_ns,
             'replica_id': replica_id,
             'internal_ips': internal_ips,
@@ -205,11 +235,15 @@ def get_env():
 def clear_all():
     global init_done
     global oracle
+    global mutex
+
+    mutex.acquire()
 
     if oracle is not None:
         del oracle
     init_done = False
 
+    mutex.release()
     return {"message": "Successfully cleared data"}
 
 

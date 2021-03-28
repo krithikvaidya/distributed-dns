@@ -27,6 +27,6 @@ export PATH=$GOPATH/bin:$PATH
 
 # download replicated key value store files
 git clone https://github.com/krithikvaidya/distributed-dns.git -b aws-dns --single-branch
-cd distributed-dns/replicated_kv_store
+cd distributed-dns/
 
 go build

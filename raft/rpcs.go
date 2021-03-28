@@ -3,7 +3,6 @@ package raft
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )

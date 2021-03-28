@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -42,7 +42,11 @@ func main() {
 
 	log.Println("Raft-based Replicated Key Value Store")
 
-	n_replica := strconv.Atoi(os.Getenv("N_REPLICA"))
+	raft.RegisterWithOracle()
+
+	raft.GetEnvFromOracle()
+
+	n_replica, _ := strconv.Atoi(os.Getenv("N_REPLICA"))
 
 	// Get replica id from env variable
 	rid, _ := strconv.Atoi(os.Getenv("REPLICA_ID"))

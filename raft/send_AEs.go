@@ -2,12 +2,10 @@ package raft
 
 import (
 	"context"
-	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
-	"google.golang.org/grpc"
 )
 
 // To send AppendEntry to single replica, and retry if needed (called by LeaderSendAEs defined below).
