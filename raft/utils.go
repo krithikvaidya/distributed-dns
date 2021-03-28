@@ -138,7 +138,7 @@ func GetEnvFromOracle() {
 			continue
 		}
 
-		os.Setenv("N_REPLICAS", strconv.Itoa(response_map.N_replicas))
+		os.Setenv("N_REPLICA", strconv.Itoa(response_map.N_replicas))
 		os.Setenv("REPLICA_ID", strconv.Itoa(response_map.Replica_id))
 		os.Setenv("TG_ARN", strings.Trim(strings.Trim(response_map.Tg_arn, " "), "\n"))
 
@@ -150,7 +150,7 @@ func GetEnvFromOracle() {
 		}
 
 		fmt.Println("Successfully obtained and set environment variables. Env variables are: ")
-		fmt.Println(os.Getenv("N_REPLICAS"))
+		fmt.Println(os.Getenv("N_REPLICA"))
 		fmt.Println(os.Getenv("REPLICA_ID"))
 		fmt.Println(os.Getenv("TG_ARN"))
 		fmt.Println(os.Getenv("INST_ID_0"))
