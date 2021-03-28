@@ -50,7 +50,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 				return
 
 			default:
-				break // break out of select block
+				// break // break out of select block
 
 			}
 
