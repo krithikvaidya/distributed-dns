@@ -109,39 +109,50 @@ func GetEnvFromOracle() {
 
 	jsonValue, _ := json.Marshal(req_data)
 
-	resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
-	if err != nil {
-		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+	for {
+
+		resp, err := http.Post("http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
+		if err != nil {
+			fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+		}
+
+		response_map := &GetEnvResponse{}
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if err != nil {
+			fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		if err = json.Unmarshal(bodyBytes, response_map); err != nil {
+			fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		if response_map.Message == "Waiting for more instances to register" {
+			fmt.Printf("\nWaiting for more instances to register\n")
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		os.Setenv("N_REPLICAS", strconv.Itoa(response_map.N_replicas))
+		os.Setenv("REPLICA_ID", strconv.Itoa(response_map.Replica_id))
+		os.Setenv("TG_ARN", response_map.Tg_arn)
+
+		for i := 0; i < response_map.N_replicas; i++ {
+
+			os.Setenv("INST_ID_"+strconv.Itoa(i), response_map.Instance_ids[i])
+			os.Setenv("REP_"+strconv.Itoa(i)+"_INTERNAL_IP", response_map.Internal_ips[i])
+
+		}
+
+		fmt.Println("Successfully obtained and set environment variables")
+		break
+
 	}
-	defer resp.Body.Close()
-
-	response_map := &GetEnvResponse{}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
-	}
-
-	if err = json.Unmarshal(bodyBytes, response_map); err != nil {
-		fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
-	}
-
-	if response_map.Message == "Waiting for more instances to register" {
-		fmt.Printf("\nWaiting for more instances to register\n")
-		return
-	}
-
-	os.Setenv("N_REPLICAS", strconv.Itoa(response_map.N_replicas))
-	os.Setenv("REPLICA_ID", strconv.Itoa(response_map.Replica_id))
-	os.Setenv("TG_ARN", response_map.Tg_arn)
-
-	for i := 0; i < response_map.N_replicas; i++ {
-
-		os.Setenv("INST_ID_"+strconv.Itoa(i), response_map.Instance_ids[i])
-		os.Setenv("REP_"+strconv.Itoa(i)+"_INTERNAL_IP", response_map.Internal_ips[i])
-
-	}
-
-	fmt.Println("Successfully obtained and set environment variables")
 
 }
 

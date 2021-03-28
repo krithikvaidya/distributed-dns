@@ -33,4 +33,4 @@ else
 
 fi
 
-runuser -l ubuntu -c 'cd /home/ubuntu/workspace/distributed-dns/ && ./replicated_kv_store'
+runuser -l ubuntu -c 'cd /home/ubuntu/workspace/distributed-dns/ && ./distributed-dns'
