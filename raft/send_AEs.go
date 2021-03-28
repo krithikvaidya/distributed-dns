@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -14,12 +15,20 @@ func (node *RaftNode) LeaderSendAE(parent_ctx context.Context, replica_id int32,
 	var response *protos.AppendEntriesResponse
 	var err error
 
+	start := time.Now()
+
 	// Call the AppendEntries RPC for the given client
 	ctx, _ := context.WithTimeout(parent_ctx, 40*time.Millisecond)
 	response, err = client_obj.AppendEntries(ctx, msg)
 
 	if err != nil {
 		return false
+	}
+
+	time_taken := time.Since(start)
+
+	if time_taken > 100*time.Millisecond {
+		log.Printf("\nCalling AppendEntries took time %v", time_taken)
 	}
 
 	node.GetLock("LeaderSendAE")

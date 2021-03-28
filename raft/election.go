@@ -118,8 +118,17 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 
 			//request vote and get reply
 			log.Printf("\nSending requestvote")
+
+			start := time.Now()
+
 			response, err := client_obj.RequestVote(ctx, &args)
 			log.Printf("\nSending RequestVote done")
+
+			time_taken := time.Since(start)
+
+			if time_taken > 100*time.Millisecond {
+				log.Printf("\nCalling requestvote rpc took time %v", time_taken)
+			}
 
 			node.GetLock("StartElection")
 

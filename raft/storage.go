@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/krithikvaidya/distributed-dns/raft/protos"
 )
@@ -142,6 +143,8 @@ func (node *RaftNode) RestoreFromStorage(storage *Storage) {
 
 func (node *RaftNode) PersistToStorage() {
 
+	start := time.Now()
+
 	node.storage.Set("currentTerm", node.currentTerm)
 	node.storage.Set("votedFor", node.votedFor)
 	node.storage.Set("log", node.log)
@@ -149,5 +152,11 @@ func (node *RaftNode) PersistToStorage() {
 	node.storage.Set("lastApplied", node.lastApplied)
 
 	node.storage.WriteFile(node.Meta.raft_persistence_file)
+
+	time_taken := time.Since(start)
+
+	if time_taken > 100*time.Millisecond {
+		log.Printf("\nPersisting raft state to storage took time %v", time_taken)
+	}
 
 }
