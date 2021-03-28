@@ -33,37 +33,44 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 
 		// prioritize checking if context is cancelled.
 		case <-parent_ctx.Done():
+			log.Printf("\nhere1\n")
 			return
 
 		default:
 
+			log.Printf("\nhere2\n")
 			select {
 
 			case <-node.stopElectiontimer: // to stop timer
-				defer node.ReleaseLock("RunElectionTimer1")
+				log.Printf("\nhere3\n")
+				node.ReleaseLock("RunElectionTimer1")
 				return
 
 			case <-node.electionResetEvent: // to reset timer when heartbeat/msg received
-
+				log.Printf("\nhere4\n")
 				node.ReleaseLock("RunElectionTimer2")
 				go node.RunElectionTimer(parent_ctx)
 				return
 
 			default:
+				log.Printf("\nhere5\n")
 				// break // break out of select block
 
 			}
 
 		}
 
+		log.Printf("\nhere6\n")
 		log.Printf("\nElection timer runs out.\n")
 
 		// if node was a follower, transition to candidate and start election
 		// if node was already candidate, restart election
 
 		node.ToCandidate(parent_ctx)
+		log.Printf("\nhere7\n")
 
 		node.ReleaseLock("RunElectionTimer3")
+		log.Printf("\nhere8\n")
 		return
 
 	case <-node.stopElectiontimer: //to stop timer
@@ -74,6 +81,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 		return
 
 	}
+
 }
 
 // StartElection is called when a node transitions to a candidate
