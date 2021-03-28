@@ -97,7 +97,7 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 		go func(ctx context.Context, node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32) {
 
 			node.GetRLock("StartElection")
-			// log.Printf("\nRLock in StartElection\n")
+			log.Printf("\nGot RLock in StartElection\n")
 
 			latestLogIndex := int32(-1)
 			latestLogTerm := int32(-1)
@@ -117,7 +117,9 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 			node.ReleaseRLock("StartElection")
 
 			//request vote and get reply
+			log.Printf("\nSending requestvote")
 			response, err := client_obj.RequestVote(ctx, &args)
+			log.Printf("\nSending RequestVote done")
 
 			node.GetLock("StartElection")
 
@@ -158,6 +160,8 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 					// can ignore the RPC response in this case.
 				}
 
+			} else {
+				log.Printf("\nError in requestvote: %v\n", err)
 			}
 
 			node.ReleaseLock("StartElection3")
