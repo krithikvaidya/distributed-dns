@@ -146,15 +146,18 @@ class Oracle:
             internal_ips.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['internal_ip'])
             instance_ids.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['inst_id'])
 
-        mutex.release()
-        return {
+        env_vars = {
             'message': '',
             'n_replicas': self.replicas_per_ns,
             'replica_id': replica_id,
             'internal_ips': internal_ips,
-            'tg_arn': self.TG_ARNs[data['region']][i//self.instances_per_region],
+            'tg_arn': (self.TG_ARNs[data['region']][i//self.instances_per_region]).strip(),
             'instance_ids': instance_ids
         }
+        print("Returning: ")
+        print(env_vars)
+        mutex.release()
+        return env_vars
                 
     
     def __init__(self, data):

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"math/rand"
@@ -68,6 +69,7 @@ func main() {
 
 		rep_i_addr := "REP_" + strconv.Itoa(i) + "_INTERNAL_IP"
 		rep_addrs[i] = os.Getenv(rep_i_addr) + ":5000"
+		fmt.Printf("\nrep_addrs[i]: %v\n", rep_addrs[i])
 	}
 
 	// Perform steps necessary to setup the node as an active replica.

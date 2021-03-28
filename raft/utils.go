@@ -140,12 +140,12 @@ func GetEnvFromOracle() {
 
 		os.Setenv("N_REPLICAS", strconv.Itoa(response_map.N_replicas))
 		os.Setenv("REPLICA_ID", strconv.Itoa(response_map.Replica_id))
-		os.Setenv("TG_ARN", response_map.Tg_arn)
+		os.Setenv("TG_ARN", strings.Trim(strings.Trim(response_map.Tg_arn, " "), "\n"))
 
 		for i := 0; i < response_map.N_replicas; i++ {
 
-			os.Setenv("INST_ID_"+strconv.Itoa(i), response_map.Instance_ids[i])
-			os.Setenv("REP_"+strconv.Itoa(i)+"_INTERNAL_IP", response_map.Internal_ips[i])
+			os.Setenv("INST_ID_"+strconv.Itoa(i), strings.Trim(strings.Trim(response_map.Instance_ids[i], " "), "\n"))
+			os.Setenv("REP_"+strconv.Itoa(i)+"_INTERNAL_IP", strings.Trim(strings.Trim(response_map.Internal_ips[i], " "), "\n"))
 
 		}
 
