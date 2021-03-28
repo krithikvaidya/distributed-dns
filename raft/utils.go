@@ -149,7 +149,16 @@ func GetEnvFromOracle() {
 
 		}
 
-		fmt.Println("Successfully obtained and set environment variables")
+		fmt.Println("Successfully obtained and set environment variables. Env variables are: ")
+		fmt.Println(os.Getenv("N_REPLICAS"))
+		fmt.Println(os.Getenv("REPLICA_ID"))
+		fmt.Println(os.Getenv("TG_ARN"))
+		fmt.Println(os.Getenv("INST_0_ID"))
+		fmt.Println(os.Getenv("INST_1_ID"))
+		fmt.Println(os.Getenv("INST_2_ID"))
+		fmt.Println(os.Getenv("REP_0_INTERNAL_IP"))
+		fmt.Println(os.Getenv("REP_1_INTERNAL_IP"))
+		fmt.Println(os.Getenv("REP_2_INTERNAL_IP"))
 		break
 
 	}

@@ -119,7 +119,6 @@ class Oracle:
 
         data['region'] = data['region'].strip()
         data['inst_id'] = data['inst_id'].strip()
-        data['internal_ip'] = data['internal_ip'].strip()
 
         ec2_client = boto3.client('ec2', region_name=data['region'])
 
@@ -144,8 +143,8 @@ class Oracle:
         instance_ids = []
 
         for j in range(self.instances_per_region):
-            internal_ips.append(self.instance_details[data['region']][(self.instances_per_region * (i / self.instances_per_region)) + j]['internal_ip'])
-            instance_ids.append(self.instance_details[data['region']][(self.instances_per_region * (i / self.instances_per_region)) + j]['inst_id'])
+            internal_ips.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['internal_ip'])
+            instance_ids.append(self.instance_details[data['region']][(self.instances_per_region * (i // self.instances_per_region)) + j]['inst_id'])
 
         mutex.release()
         return {
@@ -153,7 +152,7 @@ class Oracle:
             'n_replicas': self.replicas_per_ns,
             'replica_id': replica_id,
             'internal_ips': internal_ips,
-            'tg_arn': self.TG_ARNs[data['region']][i/self.instances_per_region],
+            'tg_arn': self.TG_ARNs[data['region']][i//self.instances_per_region],
             'instance_ids': instance_ids
         }
                 
