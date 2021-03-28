@@ -95,9 +95,11 @@ class Oracle:
 
         for instance in self.instance_details[region]:
             if instance['inst_id'] == inst_id:
+                mutex.release()
                 return {"message": "Already registered this instance for this region."}
 
         if len(self.instance_details[region]) == self.instances_per_region:
+            mutex.release()
             return {"message": "Cannot register more instances for this region."}
 
         self.instance_details[region].append({'inst_id': inst_id, 'internal_ip': internal_ip})
