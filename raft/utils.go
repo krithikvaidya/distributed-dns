@@ -111,7 +111,7 @@ func GetEnvFromOracle(oracle_addr string) {
 
 	for {
 
-		resp, err := http.Post("http://"+oracle_addr+"http://ec2-54-236-50-24.compute-1.amazonaws.com:5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
+		resp, err := http.Post("http://"+oracle_addr+":5000/get_env", "application/json", bytes.NewBuffer(jsonValue))
 		if err != nil {
 			fmt.Printf("\nError in GetEnvFromOracle: %v\n", err)
 		}

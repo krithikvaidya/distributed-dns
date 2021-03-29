@@ -1,5 +1,6 @@
 import os
 import json
+# import time
 
 import boto3
 
@@ -16,13 +17,56 @@ mutex = Lock()
 
 class Oracle:
 
+    # def create_global_accelerators(self):
+
+    #     client = boto3.client('globalaccelerator')
+        
+    #     for i in range(self.instances_per_region//self.replicas_per_ns):
+            
+    #         response = client.create_accelerator(
+    #             Name='ga-' + str(i),
+    #             IpAddressType='IPV4',
+    #             Enabled=True,
+    #         )
+
+    #         print(response)
+
+    #         response = client.create_listener(
+    #             AcceleratorArn=response['Accelerator']['AcceleratorArn'],
+    #             PortRanges=[
+    #                 {
+    #                     'FromPort': 4000,
+    #                     'ToPort': 4000
+    #                 },
+    #             ],
+    #             Protocol='TCP',
+    #         )
+
+    #         print(response)
+
+    #         for j in range(self.n_regions):
+    #             response = client.create_endpoint_group(
+    #                 ListenerArn=response['Listener']['ListenerArn'],
+    #                 EndpointGroupRegion=self.region_names[j],
+    #                 EndpointConfigurations=[
+    #                     {
+    #                         'EndpointId': self.LB_ARNs[self.region_names[j]][i],
+    #                     },
+    #                 ],
+    #             )
+                
+    #             print(response)
+
+
     def create_load_balancers(self):
 
         self.TG_ARNs = {}
+        self.LB_ARNs = {}
 
         for region in self.region_names:
 
             self.TG_ARNs[region] = []
+            self.LB_ARNs[region] = []
 
             for i in range(self.instances_per_region//self.replicas_per_ns):
                 
@@ -34,7 +78,7 @@ class Oracle:
                     ]
                 )
 
-                print (lb)
+                # print (lb)
 
                 tg = self.aws_clients[region].create_target_group(
                     Name=region + '-tg' + str(i),
@@ -44,8 +88,9 @@ class Oracle:
                     VpcId=self.VPCs[region],
                 )
 
-                print(tg)
+                # print(tg)
 
+                self.LB_ARNs[region].append(lb['LoadBalancers'][0]['LoadBalancerArn'])
                 self.TG_ARNs[region].append(tg['TargetGroups'][0]['TargetGroupArn'])
 
                 response = self.aws_clients[region].modify_target_group_attributes(
@@ -58,7 +103,7 @@ class Oracle:
                     TargetGroupArn=tg['TargetGroups'][0]['TargetGroupArn'],
                 )
 
-                print(response)
+                # print(response)
 
                 response = self.aws_clients[region].create_listener(
                     LoadBalancerArn=lb['LoadBalancers'][0]['LoadBalancerArn'],
@@ -72,7 +117,24 @@ class Oracle:
                     ]
                 )
 
-                print(response)
+                # print(response)
+                
+        # print("Done with creating LBs")
+
+        # flag = True
+        # while flag:
+        #     response = self.aws_clients[region].describe_load_balancers(
+        #         LoadBalancerArns=[
+        #             'string',
+        #         ],
+        #         Names=[
+        #             'string',
+        #         ],
+        #         Marker='string',
+        #         PageSize=123
+        #     )
+
+        #     time.sleep(3)
 
     def register_replica(self, data):
 
@@ -195,6 +257,7 @@ class Oracle:
             self.subnets[region] = response['Subnets'][0]['SubnetId']
 
         self.create_load_balancers()
+        # self.create_global_accelerators()
 
 
 @app.route('/init', methods=['POST'])

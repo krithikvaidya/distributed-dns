@@ -33,4 +33,4 @@ else
 
 fi
 
-runuser -l ubuntu -c 'export ORACLE_ADDR= && cd /home/ubuntu/workspace/distributed-dns/ && ./distributed-dns'
+runuser -l ubuntu -c 'export ORACLE_ADDR=ec2-44-192-119-167.compute-1.amazonaws.com && cd /home/ubuntu/workspace/distributed-dns/ && ./distributed-dns'
