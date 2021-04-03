@@ -1,6 +1,6 @@
 import os
 import json
-# import time
+import time
 
 import boto3
 
@@ -17,45 +17,45 @@ mutex = Lock()
 
 class Oracle:
 
-    # def create_global_accelerators(self):
+    def create_global_accelerators(self):
 
-    #     client = boto3.client('globalaccelerator')
+        client = boto3.client('globalaccelerator', region_name="us-west-2")
         
-    #     for i in range(self.instances_per_region//self.replicas_per_ns):
+        for i in range(self.instances_per_region//self.replicas_per_ns):
             
-    #         response = client.create_accelerator(
-    #             Name='ga-' + str(i),
-    #             IpAddressType='IPV4',
-    #             Enabled=True,
-    #         )
+            response = client.create_accelerator(
+                Name='ga-' + str(i),
+                IpAddressType='IPV4',
+                Enabled=True,
+            )
 
-    #         print(response)
+            print(response)
 
-    #         response = client.create_listener(
-    #             AcceleratorArn=response['Accelerator']['AcceleratorArn'],
-    #             PortRanges=[
-    #                 {
-    #                     'FromPort': 4000,
-    #                     'ToPort': 4000
-    #                 },
-    #             ],
-    #             Protocol='TCP',
-    #         )
+            listener_response = client.create_listener(
+                AcceleratorArn=response['Accelerator']['AcceleratorArn'],
+                PortRanges=[
+                    {
+                        'FromPort': 4000,
+                        'ToPort': 4000
+                    },
+                ],
+                Protocol='TCP',
+            )
 
-    #         print(response)
+            print(listener_response)
 
-    #         for j in range(self.n_regions):
-    #             response = client.create_endpoint_group(
-    #                 ListenerArn=response['Listener']['ListenerArn'],
-    #                 EndpointGroupRegion=self.region_names[j],
-    #                 EndpointConfigurations=[
-    #                     {
-    #                         'EndpointId': self.LB_ARNs[self.region_names[j]][i],
-    #                     },
-    #                 ],
-    #             )
+            for j in range(self.n_regions):
+                response = client.create_endpoint_group(
+                    ListenerArn=listener_response['Listener']['ListenerArn'],
+                    EndpointGroupRegion=self.region_names[j],
+                    EndpointConfigurations=[
+                        {
+                            'EndpointId': self.LB_ARNs[self.region_names[j]][i],
+                        },
+                    ],
+                )
                 
-    #             print(response)
+                print(response)
 
 
     def create_load_balancers(self):
@@ -119,22 +119,26 @@ class Oracle:
 
                 # print(response)
                 
-        # print("Done with creating LBs")
+        print("Done creating LBs")
 
-        # flag = True
-        # while flag:
-        #     response = self.aws_clients[region].describe_load_balancers(
-        #         LoadBalancerArns=[
-        #             'string',
-        #         ],
-        #         Names=[
-        #             'string',
-        #         ],
-        #         Marker='string',
-        #         PageSize=123
-        #     )
+        # wait till status of all LBs are "active"
+        for region in self.region_names:
 
-        #     time.sleep(3)
+            for i in range(self.instances_per_region//self.replicas_per_ns):
+
+                while True:
+                    response = self.aws_clients[region].describe_load_balancers(
+                        LoadBalancerArns=[
+                            self.LB_ARNs[region][i],
+                        ],
+                    )
+
+                    if response['LoadBalancers'][0]['State']['Code'] == 'active':
+                        break
+
+                    time.sleep(3)
+
+        print("All LBs Active")
 
     def register_replica(self, data):
 
@@ -257,7 +261,7 @@ class Oracle:
             self.subnets[region] = response['Subnets'][0]['SubnetId']
 
         self.create_load_balancers()
-        # self.create_global_accelerators()
+        self.create_global_accelerators()
 
 
 @app.route('/init', methods=['POST'])

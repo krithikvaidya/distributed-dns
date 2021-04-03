@@ -97,7 +97,6 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 		go func(ctx context.Context, node *RaftNode, client_obj protos.ConsensusServiceClient, replica_id int32) {
 
 			node.GetRLock("StartElection")
-			log.Printf("\nGot RLock in StartElection\n")
 
 			latestLogIndex := int32(-1)
 			latestLogTerm := int32(-1)

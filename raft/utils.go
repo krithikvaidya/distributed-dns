@@ -64,6 +64,7 @@ var Inst_meta EC2InstanceMetadata
 // Register replica with oracle responsible for assigning it to a nameserver.
 func RegisterWithOracle(oracle_addr string) {
 
+	// "The IP address 169.254.169.254 is a link-local address and is valid only from the instance."
 	cmd := exec.Command("wget", "-q", "-O", "-", "http://169.254.169.254/latest/meta-data/instance-id")
 	inst_id, err := cmd.Output()
 
@@ -149,16 +150,7 @@ func GetEnvFromOracle(oracle_addr string) {
 
 		}
 
-		fmt.Println("Successfully obtained and set environment variables. Env variables are: ")
-		fmt.Println(os.Getenv("N_REPLICA"))
-		fmt.Println(os.Getenv("REPLICA_ID"))
-		fmt.Println(os.Getenv("TG_ARN"))
-		fmt.Println(os.Getenv("INST_ID_0"))
-		fmt.Println(os.Getenv("INST_ID_1"))
-		fmt.Println(os.Getenv("INST_ID_2"))
-		fmt.Println(os.Getenv("REP_0_INTERNAL_IP"))
-		fmt.Println(os.Getenv("REP_1_INTERNAL_IP"))
-		fmt.Println(os.Getenv("REP_2_INTERNAL_IP"))
+		fmt.Println("Successfully obtained and set environment variables.")
 		break
 
 	}
@@ -173,6 +165,9 @@ func CheckErrorFatal(err error) {
 
 }
 
+// The below 4 functions are used to obtaining/releasing locks. If needed for
+// debugging purposes, the print statements can be uncommented to understand where
+// the locks are being held and not released.
 func (node *RaftNode) GetLock(where string) {
 
 	// log.Printf("\nReplica %v trying to get lock in %v\n", node.Meta.replica_id, where)
@@ -260,11 +255,11 @@ func (node *RaftNode) LBRegister() {
 	out, err := cmd.Output()
 
 	if err != nil {
-		log.Printf("Error occured in command1: %v\n", err.Error())
+		log.Printf("Error occured in deregistering targets: %v\n", err.Error())
 		return
 	}
 
-	log.Printf("Output1: %v", out)
+	log.Printf("Response received for derigestering targets: %v", out)
 
 	// Register self
 	iid := "INST_ID_" + strconv.Itoa(int(node.Meta.replica_id))
@@ -274,10 +269,10 @@ func (node *RaftNode) LBRegister() {
 	out, err = cmd.Output()
 
 	if err != nil {
-		log.Printf("Error occured in command2: %v\n", err.Error())
+		log.Printf("Error occured in registering targets: %v\n", err.Error())
 		return
 	}
 
-	log.Printf("Output2: %v", out)
+	log.Printf("Response recieved for registering target: %v", out)
 
 }
