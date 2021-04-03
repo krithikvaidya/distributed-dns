@@ -173,22 +173,21 @@ func Setup_raft_node(ctx context.Context, id int, n_replicas int, testing bool) 
 	go node.ApplyToStateMachine(ctx, testing)
 
 	// Starting KV store
-	kvstore_addr := ":300" + strconv.Itoa(id)
 	log.Println("Starting local key-value store...")
-	go node.StartKVStore(ctx, kvstore_addr, id, testing)
+	go node.StartKVStore(ctx, kv_addr, id, testing)
 
 	/*
 	 * Make a HTTP request to the test endpoint until a reply is obtained, indicating that
 	 * the HTTP server is up
 	 */
-	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kvstore_addr)
+	test_addr := fmt.Sprintf("http://localhost%s/kvstore", kv_addr)
 
 	for {
 
 		_, err := http.Get(test_addr)
 
 		if err == nil {
-			log.Printf("\nKey-value store up and listening at port %s\n", kvstore_addr)
+			log.Printf("\nKey-value store up and listening at port %s\n", kv_addr)
 			break
 		}
 

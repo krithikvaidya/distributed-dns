@@ -40,7 +40,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 			select {
 
 			case <-node.stopElectiontimer: // to stop timer
-				defer node.ReleaseLock("RunElectionTimer1")
+				node.ReleaseLock("RunElectionTimer1")
 				return
 
 			case <-node.electionResetEvent: // to reset timer when heartbeat/msg received
@@ -50,7 +50,7 @@ func (node *RaftNode) RunElectionTimer(parent_ctx context.Context) {
 				return
 
 			default:
-				break // break out of select block
+				// break
 
 			}
 
@@ -158,6 +158,8 @@ func (node *RaftNode) StartElection(ctx context.Context) {
 					// can ignore the RPC response in this case.
 				}
 
+			} else {
+				log.Printf("\nError in requestvote: %v\n", err)
 			}
 
 			node.ReleaseLock("StartElection3")
