@@ -2,8 +2,11 @@ package raft
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -209,6 +212,41 @@ func (test_st *testing_st) check_terms() bool {
 	}
 
 	return true
+}
+
+/*
+* This function adds 'n' new log entries by making post request to the leader
+ */
+func (test_st *testing_st) add_new_log_entries(n int, t *testing.T, startIndex int) {
+	leader_id := test_st.find_leader()
+
+	if leader_id == -1 {
+		t.Errorf("Invalid leader ID %v", leader_id)
+	} else {
+		//get leader address
+		leader_addr := ":400" + strconv.Itoa(leader_id)
+
+		// add entries by making post request to leader
+		for i := startIndex; i < n+startIndex; i++ {
+
+			url := fmt.Sprintf("http://localhost%s/key%v", leader_addr, i)
+			body := strings.NewReader(fmt.Sprintf("value=value%v&client=admin", i))
+			req, err := http.NewRequest("POST", url, body)
+			if err != nil {
+				t.Errorf("Error in making request %v", err)
+			}
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Errorf("Error in response %v", err)
+			}
+			resp.Body.Close()
+
+			// Allow entries to be added
+			time.Sleep(2 * time.Second)
+		}
+	}
 }
 
 /*
